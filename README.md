@@ -5,8 +5,7 @@ This repository contains a command prompt clone that makes it easy to create CLI
 To use command prompt 2.0, you will need to have Python 3.7+ installed on your system. You can download Python from the official website.
 
 Once you have Python installed, you can install run the following command to install the package:
-
-pip install git+https://github.com/andrewthederp/Command-Prompt-2.0
+`pip install git+https://github.com/andrewthederp/Command-Prompt-2.0`
 
 # Usage
 To use command prompt 2.0, simply import `command_prompt`, then create an instance of `command_prompt.Window`. And to run the window run `command_prompt.Window.run`
