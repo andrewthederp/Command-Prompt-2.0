@@ -23,6 +23,7 @@ def main():
 
 window.run(main)
 ~~~
+More examples can be found in the examples folder
 
 # Contributing
 We welcome contributions to this project, and we appreciate your help improving it! If you would like to contribute, please follow these steps:
