@@ -24,6 +24,12 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
+    include_package_data=True,
+    package_data={
+        '': [
+            'fonts/*'
+        ]
+    },
     python_requires=">=3.7",
     packages=find_packages(include=["command_prompt", "command_prompt.*"]),
 )
