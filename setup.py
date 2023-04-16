@@ -11,7 +11,7 @@ setup(
     long_description=desc,
     long_description_content_type="text/markdown",
     author="andrew",
-    url="https://github.com/andrewthederp/Command-Prompt-2.0",
+    url="https://github.com/andrewthederp/Command_Prompt",
     license="Apache",
     classifiers=[
         "Development Status :: 3 - Alpha",
