@@ -8,7 +8,7 @@ import re
 
 import random
 
-from COLORS import *
+from .COLORS import *
 
 pygame.init()
 
