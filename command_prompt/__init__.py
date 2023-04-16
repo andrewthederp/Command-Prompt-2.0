@@ -1,12 +1,8 @@
 import pyperclip
+import threading
 import pygame
-import random
-import time
 import copy
 import os
-import re
-
-import random
 
 from .COLORS import *
 
