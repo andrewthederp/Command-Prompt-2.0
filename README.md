@@ -35,9 +35,9 @@ We welcome contributions to this project, and we appreciate your help improving 
 * We will review your changes and merge them if they are appropriate.
 
 # TODO
-- [] Add support for more ansi codes
-- [] Add support for window re-sizing
-- [] Allow for more customizability
+- [ ] Add support for more ansi codes
+- [ ] Add support for window re-sizing
+- [ ] Allow for more customizability
 
 # Credits
 * AndreawTheDerp - Creator, maintainer
