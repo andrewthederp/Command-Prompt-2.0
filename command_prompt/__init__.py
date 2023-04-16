@@ -1,4 +1,5 @@
 import pyperclip
+import pathlib
 import pygame
 import random
 import time
@@ -69,7 +70,7 @@ class Window:
         self.clock = pygame.time.Clock()
         self.FPS = 60
 
-        file_path = os.path.join(os.path.dirname(__file__), 'fonts/CascadiaCode.ttf')
+        file_path = os.path.join(os.path.dirname(__file__), r'fonts\CascadiaCode.ttf')
         self.default_font = pygame.font.Font(file_path, 20)
         self.cell_size = self.default_font.size('H')
 
