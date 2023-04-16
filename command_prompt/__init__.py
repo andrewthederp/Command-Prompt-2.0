@@ -1,5 +1,4 @@
 import pyperclip
-import pathlib
 import pygame
 import random
 import time
