@@ -10,7 +10,7 @@ pip install git+https://github.com/andrewthederp/Command-Prompt-2.0
 
 # Usage
 To use command prompt 2.0, simply import `command_prompt`, then create an instance of `command_prompt.Window`. And to run the window run `command_prompt.Window.run`
-Simple example: ```py
+Simple example: `py
 from command_prompt import Window
 
 window = Window()
@@ -21,7 +21,7 @@ def main():
 	window.running = False # end the program
 
 window.run(main)
-```
+`
 
 # Contributing
 We welcome contributions to this project, and we appreciate your help improving it! If you would like to contribute, please follow these steps:
