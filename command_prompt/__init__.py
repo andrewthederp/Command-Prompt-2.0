@@ -1,6 +1,4 @@
-import threading
 import pyperclip
-import textwrap
 import pygame
 import random
 import time
