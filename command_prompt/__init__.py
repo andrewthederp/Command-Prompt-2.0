@@ -8,6 +8,15 @@ from .COLORS import *
 
 pygame.init()
 
+class CursorShape:
+    VINTAGE           = 0
+    BAR               = 1
+    UNDERSCORE        = 2
+    DOUBLE_UNDERSCORE = 3
+    FILLED            = 4
+    EMPTY             = 5
+    INVISIBLE         = 6
+
 class Char:
     def __init__(self, char, ansi):
         self.text = char
@@ -109,14 +118,67 @@ class Window:
         """Not meant to be used by the user"""
         w, h = self.cell_size
 
-        vintage_cursor = pygame.Rect((0, (h/4)*3), (w, h/4))
-        bar_cursor = pygame.Rect((0, 0), (1, h))
-        underscore_cursor = pygame.Rect((0, 0), (w, 1))
-        filled_cursor = pygame.Rect((0, 0), (w, h))
-        invis_cursor = pygame.Rect((0, 0), (0, 0))
-        return [vintage_cursor, bar_cursor, underscore_cursor, filled_cursor, invis_cursor]
+        vintage_cursor_surface = pygame.Surface((w, h))
+        vintage_cursor_surface.fill(DEFAULT_BACKGROUND)
+        vintage_cursor = pygame.Rect((0, h-(h/4)), (w, h/4))
+        pygame.draw.rect(vintage_cursor_surface, DEFAULT_CURSOR, vintage_cursor)
 
-    def print(self, string):
+        bar_cursor_surface = pygame.Surface((w, h))
+        bar_cursor_surface.fill(DEFAULT_BACKGROUND)
+        bar_cursor = pygame.Rect((0, 0), (1, h))
+        pygame.draw.rect(bar_cursor_surface, DEFAULT_CURSOR, bar_cursor)
+
+        underscore_cursor_surface = pygame.Surface((w, h))
+        underscore_cursor_surface.fill(DEFAULT_BACKGROUND)
+        underscore_cursor = pygame.Rect((0, h-1), (w, 1))
+        pygame.draw.rect(underscore_cursor_surface, DEFAULT_CURSOR, underscore_cursor)
+
+        double_underscore_cursor_surface = pygame.Surface((w, h))
+        double_underscore_cursor_surface.fill(DEFAULT_BACKGROUND)
+        double_underscore_cursor1 = pygame.Rect((0, h-1), (w, 1))
+        double_underscore_cursor2 = pygame.Rect((0, h-3), (w, 1))
+        pygame.draw.rect(double_underscore_cursor_surface, DEFAULT_CURSOR, double_underscore_cursor1)
+        pygame.draw.rect(double_underscore_cursor_surface, DEFAULT_CURSOR, double_underscore_cursor2)
+
+        filled_cursor_surface = pygame.Surface((w, h))
+        filled_cursor_surface.fill(DEFAULT_BACKGROUND)
+        filled_cursor = pygame.Rect((0, 0), (w, h))
+        pygame.draw.rect(filled_cursor_surface, DEFAULT_CURSOR, filled_cursor)
+
+        empty_cursor_surface = pygame.Surface((w, h))
+        empty_cursor_surface.fill(DEFAULT_BACKGROUND)
+        empty_cursor = pygame.Rect((0, 0), (w, h))
+        pygame.draw.rect(empty_cursor_surface, DEFAULT_CURSOR, empty_cursor, 2)
+
+        invis_cursor_surface = pygame.Surface((w, h))
+        invis_cursor_surface.fill(DEFAULT_BACKGROUND)
+        invis_cursor = pygame.Rect((0, 0), (0, 0))
+        pygame.draw.rect(invis_cursor_surface, DEFAULT_CURSOR, invis_cursor)
+
+        return [
+            vintage_cursor_surface,
+            bar_cursor_surface,
+            underscore_cursor_surface,
+            double_underscore_cursor_surface,
+            filled_cursor_surface,
+            empty_cursor_surface,
+            invis_cursor_surface
+        ]
+
+    def change_cursor(self, cursor):
+        self.cursor = cursor
+
+    # def get_ansi_code_positions(self, text):
+    #     ansi_codes = re.findall(r'\x1b\[(.*?m)', text)
+    #     ansi_code_positions = []
+    #     offset = 0
+    #     for code in ansi_codes:
+    #         start_pos = text.find('\x1b[' + code) - offset
+    #         ansi_code_positions.append((start_pos, code[:-1]))
+    #         offset += len('\x1b[' + code)
+    #     return ansi_code_positions
+
+    def print(self, string, *, add=False):
         """Print text to the console"""
         
         string = str(string)
@@ -160,7 +222,7 @@ class Window:
                 self.array[y].append(Char(" ", self.current_ansi))
 
             try:
-                self.array[y][x] = Char(char, self.current_ansi)
+                self.array[y].insert(x, Char(char, self.current_ansi))
             except IndexError:
                 print(f"{x=}, {y=}, {self.array}")
             x += 1
@@ -185,6 +247,14 @@ class Window:
                     y -= 1
                     x = len(self.array[y])
         self.cursor_pos = [x, y]
+
+    def delete_row(self):
+        """Removes everything on the same row as the cursor"""
+        _, y = self.cursor_pos
+        try:
+            self.array[y] = []
+        except IndexError: # just a pre-caution. Should never be executed
+            pass
 
     def move_cursor_to(self, x, y):
         """Move the cursor to a certain `x`, `y`"""
@@ -235,33 +305,51 @@ class Window:
 
         while self.running:
             first_press = self.get_pressed_key()
+            
+
             if self.current_button and (first_press or pygame.time.get_ticks() >= self.current_button['next_press']):
+                x, y = self.cursor_pos
 
                 if self.current_button['key'] == 8:
                     if user_text:
-                        user_text = user_text[:-1]
+                        user_text = user_text[:y] + user_text[y+1:]
                         self.delete_text()
+
+                # elif self.current_button['key'] == 1073741903:
+                #     self.cursor_blinker = 60
+                #     if x+1 <= len(user_text)+starting_x:
+                #         self.move_cursor_to(x+1, y)
+
+                # elif self.current_button['key'] == 1073741904:
+                #     self.cursor_blinker = 60
+                #     if x-1 >= starting_x:
+                #         self.move_cursor_to(x-1, y)
 
                 elif self.current_button['unicode'] == '\x16':
                     for char in pyperclip.paste():
                         if char == '\n':
                             break
-                        self.print(char)
-                        user_text += char
+                        self.print(char, add=True)
+                        user_text = list(user_text)
+                        user_text.insert(x, char)
+                        user_text = ''.join(user_text)
 
                 elif self.current_button['unicode'] == '\r':
                     return user_text
 
                 elif self.current_button['unicode'] == '\t':
-                    for _ in range(4):
-                        self.print(' ')
-                    user_text += '\t'
+                    self.print('    ', add=True)
+                    user_text = list(user_text)
+                    user_text.insert(x, '    ')
+                    user_text = ''.join(user_text)
 
                 else:
                     if self.current_button['unicode'] not in ['\b', '\x16', '']:
                         char = self.current_button['unicode']
-                        self.print(char)
-                        user_text += char
+                        self.print(char, add=True)
+                        user_text = list(user_text)
+                        user_text.insert(x, char)
+                        user_text = ''.join(user_text)
 
     def update_screen(self):
         """Not meant to be used by the user"""
@@ -276,6 +364,17 @@ class Window:
             cursor_pos_copy[0] -= 1 if self.array[-1][0].text == '\n' else 0
         except IndexError:
             pass
+
+        self.cursor_blinker -= 1
+
+        if self.cursor_blinker >= 0:
+            cursor_surface = self.cursors[self.cursor]
+            x = self.cell_size[0] * cursor_pos_copy[0]
+            y = self.cell_size[1] * cursor_pos_copy[1]
+            self.screen.blit(cursor_surface, (x, y))
+
+        elif self.cursor_blinker <= -60:
+            self.cursor_blinker = 60
 
         for x in range(self.window_rows):
             x_offset = 0
@@ -294,16 +393,6 @@ class Window:
                 except IndexError:
                     pass
 
-        self.cursor_blinker -= 1
-
-        if self.cursor_blinker >= 0:
-            cursor_rect = self.cursors[self.cursor]
-            cursor_rect.x = self.cell_size[0] * cursor_pos_copy[0]
-            cursor_rect.y = self.cell_size[1] * cursor_pos_copy[1]
-            pygame.draw.rect(self.screen, DEFAULT_CURSOR, cursor_rect)
-        elif self.cursor_blinker <= -60:
-            self.cursor_blinker = 60
-
         
         rect = pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*2), 0), ((self.cell_size[0]*2), self.screen_dimensions[1]))
         pygame.draw.rect(self.screen, (37, 37, 37), rect)
@@ -317,7 +406,6 @@ class Window:
 
             rect = pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*2), pos), (self.cell_size[0]*2, length))
             pygame.draw.rect(self.screen, (120, 120, 120), rect)
-
 
         pygame.display.flip()
 
