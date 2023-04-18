@@ -116,16 +116,6 @@ class Window:
         invis_cursor = pygame.Rect((0, 0), (0, 0))
         return [vintage_cursor, bar_cursor, underscore_cursor, filled_cursor, invis_cursor]
 
-    # def get_ansi_code_positions(self, text):
-    #     ansi_codes = re.findall(r'\x1b\[(.*?m)', text)
-    #     ansi_code_positions = []
-    #     offset = 0
-    #     for code in ansi_codes:
-    #         start_pos = text.find('\x1b[' + code) - offset
-    #         ansi_code_positions.append((start_pos, code[:-1]))
-    #         offset += len('\x1b[' + code)
-    #     return ansi_code_positions
-
     def print(self, string):
         """Print text to the console"""
         
@@ -209,7 +199,7 @@ class Window:
 
         if len(self.array[y]) <= x:
             for _ in range(len(self.array[y]), x+1):
-                self.array[y].append(Char(' '))
+                self.array[y].append(Char(' ', self.current_ansi))
 
         self.cursor_pos[0], self.cursor_pos[1] = x, y
 
