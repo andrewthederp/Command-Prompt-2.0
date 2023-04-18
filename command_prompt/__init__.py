@@ -1,5 +1,5 @@
-import pyperclip
 import threading
+import pyperclip
 import pygame
 import copy
 import os
@@ -62,37 +62,51 @@ class Char:
 
 class Window:
     def __init__(self, *, caption="Command prompt 2.0"):
+        # fps limiter
         self.clock = pygame.time.Clock()
         self.FPS = 60
 
-        file_path = os.path.join(os.path.dirname(__file__), r'fonts\CascadiaCode.ttf')
-        self.default_font = pygame.font.Font(file_path, 20)
+        # initialising the font. TODO: allow the user to load custom fonts
+        self.default_font = pygame.font.Font('./fonts/CascadiaCode.ttf', 20)
         self.cell_size = self.default_font.size('H')
 
+
+        # window settings
         self.window_columns = 120
         self.window_rows = 30
         self.screen_dimensions = (self.window_columns * self.cell_size[0] + 10, self.window_rows * self.cell_size[1])
         self.screen = pygame.display.set_mode(self.screen_dimensions)
 
+        # .
         self.running = True
         pygame.display.set_caption(caption)
 
-
-        self.cursor_pos = [0, 0]
         self.array = [[]]
 
         self.events = []
 
         self.row_offset = 0
 
+        # controlling the cursor
+        self.cursor_pos = [0, 0]
         self.cursors = self.create_cursors()
         self.cursor = 1
         self.cursor_blinker = 60
 
+        # ansi
         self.current_ansi = []
+
+        # Controlling key input
+        self.current_button = None
+
+        self.cooldown = 500
+        self.repeat_rate = 25
+
+        self.key_detected = False
 
 
     def create_cursors(self):
+        """Not meant to be used by the user"""
         w, h = self.cell_size
 
         vintage_cursor = pygame.Rect((0, (h/4)*3), (w, h/4))
@@ -113,7 +127,9 @@ class Window:
     #     return ansi_code_positions
 
     def print(self, string):
-        # global cursor_pos, array, cursor_blinker, current_ansi, row_offset
+        """Print text to the console"""
+        
+        string = str(string)
         self.cursor_blinker = 60
         x, y = self.cursor_pos
 
@@ -162,7 +178,7 @@ class Window:
         self.cursor_pos[0], self.cursor_pos[1] = x, y
 
     def delete_text(self, amount=1):
-        # global cursor_pos, cursor_blinker
+        """Delete `amount` text from the console. TODO: don't use a for loop"""
         self.cursor_blinker = 60
         x, y = self.cursor_pos
         for _ in range(amount):
@@ -181,7 +197,7 @@ class Window:
         self.cursor_pos = [x, y]
 
     def move_cursor_to(self, x, y):
-        # global cursor_pos
+        """Move the cursor to a certain `x`, `y`"""
         if not isinstance(x, int) or not isinstance(y, int):
             raise ValueError("Cursor position values must be integers")
         if x < 0 or y < 0:
@@ -197,86 +213,68 @@ class Window:
 
         self.cursor_pos[0], self.cursor_pos[1] = x, y
 
+    def get_pressed_key(self):
+        self.key_detected = False
+        for event in self.events:
+            if event.type == pygame.KEYDOWN and not self.key_detected:
+                self.key_detected = True
+                if (not self.current_button) or (self.current_button['key'] != event.dict['key']):
+                    dct = event.dict
+                    dct['next_press'] = pygame.time.get_ticks() + self.cooldown
+                    self.current_button = dct
+                    return True
+            if event.type == pygame.KEYUP:
+                if (self.current_button) and self.current_button['key'] == event.dict['key']:
+                    self.current_button = None
+
+        if self.current_button:
+            if pygame.time.get_ticks() >= self.current_button['next_press']:
+                self.current_button['next_press'] = pygame.time.get_ticks() + self.repeat_rate
+
+        # as of right now, without these prints. The program jitters. I cannot explain it
+        print()
+        print('\x1b[1A\x1b[1K', end='')
+
     def input(self, prompt=''):
-        # global events
+        """The default input function, feel free to make your own"""
         self.print(prompt)
-
-        current_button = None
-
-        cooldown = 500
-        repeat_rate = 25
 
         user_text = ''
         starting_x = copy.copy(self.cursor_pos[0])
         starting_y = copy.copy(self.cursor_pos[1])
 
         while self.running:
-            key_detected = False
-            for event in self.events:
-                if event.type == pygame.KEYDOWN and not key_detected:
-                    key_detected = True
-                    if (not current_button) or (current_button['key'] != event.dict['key']):
-                        dct = event.dict
-                        dct['next_press'] = pygame.time.get_ticks() + cooldown
-                        current_button = dct
-                        if current_button['key'] == 8:
-                            if user_text:
-                                user_text = user_text[:-1]
-                                self.delete_text()
-                            # else:
-                            #     user_text = user_text[:-1]
-                            #     delete_text()
-                        elif current_button['unicode'] == '\x16':
-                            for char in pyperclip.paste():
-                                if char == '\n':
-                                    break
-                                self.print(char)
-                                user_text += char
-                        elif current_button['unicode'] == '\r':
-                            return user_text
-                        elif current_button['unicode'] == '\t':
-                            for _ in range(4):
-                                self.print(' ')
-                            user_text += '\t'
-                        else:
-                            if current_button['key'] not in [8, 118]:
-                                char = current_button['unicode']
-                                self.print(char)
-                                user_text += char
-                elif event.type == pygame.KEYUP:
-                    if (current_button) and current_button['key'] == event.dict['key']:
-                        current_button = None
+            first_press = self.get_pressed_key()
+            if self.current_button and (first_press or pygame.time.get_ticks() >= self.current_button['next_press']):
 
-            if current_button:
-                if pygame.time.get_ticks() >= current_button['next_press']:
-                    current_button['next_press'] = pygame.time.get_ticks() + repeat_rate
-                    if current_button['key'] == 8:
-                        if user_text:
-                            user_text = user_text[:-1]
-                            self.delete_text()
-                        # else:
-                        #     user_text = user_text[:-1]
-                        #     delete_text()
-                    elif current_button['unicode'] == '\x16':
-                        for char in pyperclip.paste():
-                            if char == '\n':
-                                break
-                            self.print(char)
-                            user_text += char
-                    if current_button['unicode'] == '\r':
-                        return user_text
-                    if current_button['unicode'] == '\t':
-                        for _ in range(4):
-                            self.print(' ')
-                        user_text += '\t'
-                    else:
-                        if current_button['key'] not in [8, 118]:
-                            char = current_button['unicode']
-                            self.print(char)
-                            user_text += char
+                if self.current_button['key'] == 8:
+                    if user_text:
+                        user_text = user_text[:-1]
+                        self.delete_text()
+
+                elif self.current_button['unicode'] == '\x16':
+                    for char in pyperclip.paste():
+                        if char == '\n':
+                            break
+                        self.print(char)
+                        user_text += char
+
+                elif self.current_button['unicode'] == '\r':
+                    return user_text
+
+                elif self.current_button['unicode'] == '\t':
+                    for _ in range(4):
+                        self.print(' ')
+                    user_text += '\t'
+
+                else:
+                    if self.current_button['unicode'] not in ['\b', '\x16', '']:
+                        char = self.current_button['unicode']
+                        self.print(char)
+                        user_text += char
 
     def update_screen(self):
-        # global cursor_blinker, row_offset
+        """Not meant to be used by the user"""
 
         font = self.default_font
 
@@ -289,15 +287,22 @@ class Window:
         except IndexError:
             pass
 
-        for row_num, row in enumerate(self.array[self.row_offset:self.row_offset+self.window_rows]):
+        for x in range(self.window_rows):
             x_offset = 0
-            for char in row:
-                if char.text == '\n':
-                    continue
-                char_surface = font.render(char.text, True, char.color)
-                self. screen.blit(char_surface, (x_offset, y_offset))
-                x_offset += font.size(str(char.text))[0]
-            y_offset += font.size(str(row))[1]
+            for y in range(self.window_columns):
+                try:
+                    char = self.array[x+self.row_offset][y]
+                    if char.text == '\n':
+                        continue
+                    char_surface = font.render(char.text, True, char.color)
+                    topleft = (x_offset, self.cell_size[1]*x)
+                    background_rect = char_surface.get_rect(topleft=topleft)
+                    # pygame.draw.rect(self.screen, (), background_rect)
+                    self.screen.blit(char_surface, topleft)
+
+                    x_offset += self.cell_size[0]
+                except IndexError:
+                    pass
 
         self.cursor_blinker -= 1
 
