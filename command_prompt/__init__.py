@@ -96,6 +96,8 @@ class Window:
 
         self.row_offset = 0
 
+        self.word_delimiters = " /\()\"'-.,:;<>~!@#$%^&*|+=[]{}~?│ "
+
         # controlling the cursor
         self.cursor_pos = [0, 0]
         self.cursors = self.create_cursors()
@@ -209,17 +211,17 @@ class Window:
                     escape_sequence += char
                 continue
 
-            if x >= self.window_columns:
-                y += 1
-                x = 0
+            # if x >= self.window_columns:
+            #     y += 1
+            #     x = 0
 
             if y >= len(self.array):
                 for _ in range((y-len(self.array))+1):
                     self.array.append([])
                     if len(self.array) > self.window_rows:
                         self.row_offset += 1
-            while x >= len(self.array[y]):
-                self.array[y].append(Char(" ", self.current_ansi))
+            while x >= len(self.array[y])+1:
+                self.array[y].append(Char("", self.current_ansi))
 
             try:
                 self.array[y].insert(x, Char(char, self.current_ansi))
@@ -230,29 +232,42 @@ class Window:
         self.cursor_pos[0], self.cursor_pos[1] = x, y
 
     def delete_text(self, amount=1):
-        """Delete `amount` text from the console. TODO: don't use a for loop"""
+        """Delete `amount` text from the console."""
         self.cursor_blinker = 60
+        original_x, original_y = copy.copy(self.cursor_pos)
         x, y = self.cursor_pos
-        for _ in range(amount):
-            x -= 1
-            if x < 0:
-                if y-1 < 0:
-                    break
-                else:
-                    y -= 1
-                    x = len(self.array[y])
+        text_before = self.array[original_y][x:]
+
+        for row in (self.array[:y+1])[::-1]:
+            if len(row)-len(text_before) > amount:
+                x -= amount
+                break
             else:
-                self.array[y].pop(x)
-                if not len(self.array[y]):
-                    y -= 1
-                    x = len(self.array[y])
+                y -= 1
+
+                x = len(self.array[y])
+                amount -= len(row)
+                if y == -1:
+                    y = 0
+                    break
+
+        if original_y != y:
+            for num in range(y+1, original_y+1): # Would have preferred to not use a for loop here but `del` wouldn't work here.
+                self.array.pop(num)
+            del self.array[y][x:len(self.array[y])-1]
+            self.array[y].extend(text_before)
+        else:
+            del self.array[y][x:original_x]
+
         self.cursor_pos = [x, y]
+
 
     def delete_row(self):
         """Removes everything on the same row as the cursor"""
         _, y = self.cursor_pos
         try:
             self.array[y] = []
+            self.cursor_pos[0] = 0
         except IndexError: # just a pre-caution. Should never be executed
             pass
 
@@ -269,7 +284,7 @@ class Window:
 
         if len(self.array[y]) <= x:
             for _ in range(len(self.array[y]), x+1):
-                self.array[y].append(Char(' ', self.current_ansi))
+                self.array[y].append(Char('', self.current_ansi))
 
         self.cursor_pos[0], self.cursor_pos[1] = x, y
 
@@ -305,15 +320,29 @@ class Window:
 
         while self.running:
             first_press = self.get_pressed_key()
-            
 
             if self.current_button and (first_press or pygame.time.get_ticks() >= self.current_button['next_press']):
                 x, y = self.cursor_pos
 
                 if self.current_button['key'] == 8:
                     if user_text:
-                        user_text = user_text[:y] + user_text[y+1:]
-                        self.delete_text()
+                        if self.current_button['mod'] == 4160:
+                            try:
+                                if user_text[(x-starting_x)-1] in self.word_delimiters:
+                                    while user_text[(x-starting_x)-1] in self.word_delimiters:
+                                        self.delete_text()
+                                        user_text = user_text[:x-starting_x-1] + user_text[x-starting_x-1+1:]
+                                        x, y = self.cursor_pos
+                                else:
+                                    while user_text[(x-starting_x)-1] not in self.word_delimiters:
+                                        self.delete_text()
+                                        user_text = user_text[:x-starting_x-1] + user_text[x-starting_x-1+1:]
+                                        x, y = self.cursor_pos
+                            except IndexError:
+                                pass
+                        else:
+                            user_text = user_text[:y] + user_text[y+1:]
+                            self.delete_text()
 
                 # elif self.current_button['key'] == 1073741903:
                 #     self.cursor_blinker = 60
@@ -351,19 +380,35 @@ class Window:
                         user_text.insert(x, char)
                         user_text = ''.join(user_text)
 
+    def wrap(self, iterable, num):
+        for current_num in range(0, len(iterable), num):
+            yield iterable[current_num:current_num+num]
+
     def update_screen(self):
         """Not meant to be used by the user"""
 
         font = self.default_font
 
         y_offset = 0
-        self. screen.fill(DEFAULT_BACKGROUND)
+        self.screen.fill(DEFAULT_BACKGROUND)
+
 
         cursor_pos_copy = copy.deepcopy(self.cursor_pos)
         try:
             cursor_pos_copy[0] -= 1 if self.array[-1][0].text == '\n' else 0
         except IndexError:
             pass
+
+        array_copy = []
+        for x, row in enumerate(self.array):
+            if len(row) >= self.window_columns:
+                wrapped = list(self.wrap(row, self.window_columns-2))
+                array_copy.extend(wrapped)
+                if cursor_pos_copy[1] == x:
+                    cursor_pos_copy[1] += len(wrapped)-1
+                    cursor_pos_copy[0] = len(wrapped[-1])-1
+            else:
+                array_copy.append(row)
 
         self.cursor_blinker -= 1
 
@@ -380,7 +425,7 @@ class Window:
             x_offset = 0
             for y in range(self.window_columns):
                 try:
-                    char = self.array[x+self.row_offset][y]
+                    char = array_copy[x+self.row_offset][y]
                     if char.text == '\n':
                         continue
                     char_surface = font.render(char.text, True, char.color)
@@ -397,11 +442,11 @@ class Window:
         rect = pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*2), 0), ((self.cell_size[0]*2), self.screen_dimensions[1]))
         pygame.draw.rect(self.screen, (37, 37, 37), rect)
 
-        if len(self.array) > self.window_rows:
-            perc = self.window_rows/len(self.array)
+        if len(array_copy) > self.window_rows:
+            perc = self.window_rows/len(array_copy)
             length = self.screen_dimensions[1]*perc
 
-            pos = self.row_offset/len(self.array)
+            pos = self.row_offset/len(array_copy)
             pos = pos*self.screen_dimensions[1]
 
             rect = pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*2), pos), (self.cell_size[0]*2, length))
