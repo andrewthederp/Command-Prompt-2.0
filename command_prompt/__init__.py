@@ -4,7 +4,7 @@ import pygame
 import copy
 import os
 
-from .COLORS import *
+from .colors import *
 
 pygame.init()
 
@@ -21,53 +21,80 @@ class Char:
     def __init__(self, char, ansi):
         self.text = char
         self.ansi = copy.deepcopy(ansi)
-        self.color = DEFAULT_FOREGROUND
+        self.foreground_color = DEFAULT_FOREGROUND
+        self.background_color = DEFAULT_BACKGROUND
+
+        self.text_formattings = {
+            'bold':          False,
+            'dim':           False,
+            'italic':        False,
+            'underline':     False,
+            'blinking':      False,
+            'invis':         False,
+            'strikethrough': False
+        }
 
         for ansi_code in self.ansi:
-            if ansi_code == '30':
-                self.color = BLACK
-            elif ansi_code == '31':
-                self.color = RED
-            elif ansi_code == '32':
-                self.color = GREEN
-            elif ansi_code == '33':
-                self.color = YELLOW
-            elif ansi_code == '34':
-                self.color = BLUE
-            elif ansi_code == '35':
-                self.color = PURPLE
-            elif ansi_code == '36':
-                self.color = CYAN
-            elif ansi_code == '37':
-                self.color = WHITE
-
-            if ansi_code == '90':
-                self.color = LIGHT_BLACK
-            elif ansi_code == '91':
-                self.color = LIGHT_RED
-            elif ansi_code == '92':
-                self.color = LIGHT_GREEN
-            elif ansi_code == '93':
-                self.color = LIGHT_YELLOW
-            elif ansi_code == '94':
-                self.color = LIGHT_BLUE
-            elif ansi_code == '95':
-                self.color = LIGHT_PURPLE
-            elif ansi_code == '96':
-                self.color = LIGHT_CYAN
-            elif ansi_code == '97':
-                self.color = LIGHT_WHITE
-
-            elif ansi_code.startswith('38;2;'):
+            if ansi_code.startswith('38;2;'):
                 try:
                     _, _, r, g, b = ansi_code.split(';')
                 except ValueError:
                     pass
                 else:
-                    self.color = (int(r), int(g), int(b))
+                    self.foreground_color = (int(r), int(g), int(b))
+            if ansi_code.startswith('48;2;'):
+                try:
+                    _, _, r, g, b = ansi_code.split(';')
+                except ValueError:
+                    pass
+                else:
+                    self.background_color = (int(r), int(g), int(b))
+            elif ansi_code.startswith('38;5;'):
+                try:
+                    self.foreground_color = bit256_color_converter(int(ansi_code.split(';')[-1]))
+                except ValueError:
+                    pass
+            elif ansi_code.startswith('48;5;'):
+                try:
+                    self.background_color = bit256_color_converter(int(ansi_code.split(';')[-1]))
+                except ValueError:
+                    pass
+            elif ansi_code == '1':
+                self.text_formattings['bold'] = True
+            elif ansi_code == '2':
+                self.text_formattings['dim'] = True
+            elif ansi_code == '3':
+                self.text_formattings['italic'] = True
+            elif ansi_code == '4':
+                self.text_formattings['underline'] = True
+            elif ansi_code == '5':
+                self.text_formattings['blinking'] = True
+            elif ansi_code == '6':
+                self.text_formattings['blinking'] = True
+            elif ansi_code == '7':
+                fg = copy.deepcopy(self.foreground_color)
+                bg = copy.deepcopy(self.background_color)
+                self.background_color = fg
+                self.foreground_color = bg
+            elif ansi_code == '8':
+                self.text_formattings['invis'] = True
+            elif ansi_code == '9':
+                self.text_formattings['strikethrough'] = True
+            else:
+                try:
+                    ansi_code = int(ansi_code)
+                except ValueError:
+                    continue
+
+                if ansi_code in range(30, 38):
+                    self.foreground_color = BIT8_COLORS[int(ansi_code)-30]
+                elif ansi_code in range(90, 98):
+                    self.foreground_color = BIT16_COLORS[int(ansi_code)-82]
+                elif ansi_code in range(40, 48):
+                    self.background_color = BIT8_COLORS[int(ansi_code)-40]
 
     def __repr__(self):
-        return f'<char="{self.text}", color={self.color}>'
+        return f'<char="{self.text}", foreground_color={self.foreground_color}>, background_color={self.background_color}'
 
 class Window:
     def __init__(self, *, caption="Command prompt 2.0"):
@@ -77,7 +104,11 @@ class Window:
 
         # initialising the font. TODO: allow the user to load custom fonts
         self.default_font = pygame.font.Font('./fonts/CascadiaCode.ttf', 20)
+        self.bold_default_font = pygame.font.Font('./fonts/CascadiaCode-Bold.ttf', 20)
+        self.italic_default_font = pygame.font.Font('./fonts/CascadiaCodeItalic.ttf', 20)
+        self.bold_italic_default_font = pygame.font.Font('./fonts/CascadiaCode-BoldItalic.ttf', 20)
         self.cell_size = self.default_font.size('H')
+
 
         # window settings
         self.window_columns = 120
@@ -210,6 +241,10 @@ class Window:
                     escape_sequence += char
                 continue
 
+            # if x >= self.window_columns:
+            #     y += 1
+            #     x = 0
+
             if y >= len(self.array):
                 for _ in range((y-len(self.array))+1):
                     self.array.append([])
@@ -258,8 +293,7 @@ class Window:
 
 
     def delete_row(self):
-        """Removes everything on the same row as the cursor
-        Warning: if the line is being text-wrapped. This function will remove more than the visual row"""
+        """Removes everything on the same row as the cursor"""
         _, y = self.cursor_pos
         try:
             self.array[y] = []
@@ -322,7 +356,7 @@ class Window:
 
                 if self.current_button['key'] == 8:
                     if user_text:
-                        if self.current_button['mod'] == 4160: # shift-backspace
+                        if self.current_button['mod'] == 4160:
                             try:
                                 if user_text[(x-starting_x)-1] in self.word_delimiters:
                                     while user_text[(x-starting_x)-1] in self.word_delimiters:
@@ -352,7 +386,7 @@ class Window:
 
                 elif self.current_button['unicode'] == '\x16':
                     for char in pyperclip.paste():
-                        if char == '\n': # plan to add a preview like in command prompt
+                        if char == '\n':
                             break
                         self.print(char, add=True)
                         user_text = list(user_text)
@@ -362,7 +396,7 @@ class Window:
                 elif self.current_button['unicode'] == '\r':
                     return user_text
 
-                elif self.current_button['unicode'] == '\t': # plans to add an actual tab instead of 4 spaces
+                elif self.current_button['unicode'] == '\t':
                     self.print('    ', add=True)
                     user_text = list(user_text)
                     user_text.insert(x, '    ')
@@ -382,8 +416,6 @@ class Window:
 
     def update_screen(self):
         """Not meant to be used by the user"""
-
-        font = self.default_font
 
         y_offset = 0
         self.screen.fill(DEFAULT_BACKGROUND)
@@ -424,10 +456,40 @@ class Window:
                     char = array_copy[x+self.row_offset][y]
                     if char.text == '\n':
                         continue
-                    char_surface = font.render(char.text, True, char.color)
+                    if char.text_formattings['bold'] and char.text_formattings['italic']:
+                        font = self.bold_italic_default_font
+                    elif char.text_formattings['bold']:
+                        font = self.bold_default_font
+                    elif char.text_formattings['italic']:
+                        font = self.italic_default_font
+                    else:
+                        font = self.default_font
+
+                    # if char.text_formattings['dim']: # idk how dim works
+                    #     r, g, b = char.foreground_color
+                    #     char.foreground_color = (r//2, g//2, b//2)
+
+                    char_surface = font.render(char.text, True, char.foreground_color)
                     topleft = (x_offset, self.cell_size[1]*x)
+
+                    if char.text_formattings['underline']:
+                        font.set_underline(True)
+                    else:
+                        font.set_underline(False)
+
+                    if char.text_formattings['invis']:
+                        background_rect = char_surface.get_rect(topleft=topleft)
+                        pygame.draw.rect(self.screen, char.background_color, background_rect)
+                        x_offset += self.cell_size[0]
+                        continue
+
+                    if char.text_formattings['strikethrough']:
+                        font.set_strikethrough(True)
+                    else:
+                        font.set_strikethrough(False)
+
                     background_rect = char_surface.get_rect(topleft=topleft)
-                    # pygame.draw.rect(self.screen, (), background_rect)
+                    pygame.draw.rect(self.screen, char.background_color, background_rect)
                     self.screen.blit(char_surface, topleft)
 
                     x_offset += self.cell_size[0]
