@@ -79,7 +79,6 @@ class Window:
         self.default_font = pygame.font.Font('./fonts/CascadiaCode.ttf', 20)
         self.cell_size = self.default_font.size('H')
 
-
         # window settings
         self.window_columns = 120
         self.window_rows = 30
@@ -211,10 +210,6 @@ class Window:
                     escape_sequence += char
                 continue
 
-            # if x >= self.window_columns:
-            #     y += 1
-            #     x = 0
-
             if y >= len(self.array):
                 for _ in range((y-len(self.array))+1):
                     self.array.append([])
@@ -263,7 +258,8 @@ class Window:
 
 
     def delete_row(self):
-        """Removes everything on the same row as the cursor"""
+        """Removes everything on the same row as the cursor
+        Warning: if the line is being text-wrapped. This function will remove more than the visual row"""
         _, y = self.cursor_pos
         try:
             self.array[y] = []
@@ -326,7 +322,7 @@ class Window:
 
                 if self.current_button['key'] == 8:
                     if user_text:
-                        if self.current_button['mod'] == 4160:
+                        if self.current_button['mod'] == 4160: # shift-backspace
                             try:
                                 if user_text[(x-starting_x)-1] in self.word_delimiters:
                                     while user_text[(x-starting_x)-1] in self.word_delimiters:
@@ -344,19 +340,19 @@ class Window:
                             user_text = user_text[:y] + user_text[y+1:]
                             self.delete_text()
 
-                # elif self.current_button['key'] == 1073741903:
-                #     self.cursor_blinker = 60
-                #     if x+1 <= len(user_text)+starting_x:
-                #         self.move_cursor_to(x+1, y)
+                elif self.current_button['key'] == 1073741903:
+                    self.cursor_blinker = 60
+                    if x+1 <= len(user_text)+starting_x:
+                        self.move_cursor_to(x+1, y)
 
-                # elif self.current_button['key'] == 1073741904:
-                #     self.cursor_blinker = 60
-                #     if x-1 >= starting_x:
-                #         self.move_cursor_to(x-1, y)
+                elif self.current_button['key'] == 1073741904:
+                    self.cursor_blinker = 60
+                    if x-1 >= starting_x:
+                        self.move_cursor_to(x-1, y)
 
                 elif self.current_button['unicode'] == '\x16':
                     for char in pyperclip.paste():
-                        if char == '\n':
+                        if char == '\n': # plan to add a preview like in command prompt
                             break
                         self.print(char, add=True)
                         user_text = list(user_text)
@@ -366,7 +362,7 @@ class Window:
                 elif self.current_button['unicode'] == '\r':
                     return user_text
 
-                elif self.current_button['unicode'] == '\t':
+                elif self.current_button['unicode'] == '\t': # plans to add an actual tab instead of 4 spaces
                     self.print('    ', add=True)
                     user_text = list(user_text)
                     user_text.insert(x, '    ')
@@ -401,12 +397,12 @@ class Window:
 
         array_copy = []
         for x, row in enumerate(self.array):
-            if len(row) >= self.window_columns:
+            if len(row) >= self.window_columns-1:
                 wrapped = list(self.wrap(row, self.window_columns-2))
                 array_copy.extend(wrapped)
-                if cursor_pos_copy[1] == x:
+                if cursor_pos_copy[1] == x and cursor_pos_copy[0] >= self.window_columns-1:
                     cursor_pos_copy[1] += len(wrapped)-1
-                    cursor_pos_copy[0] = len(wrapped[-1])-1
+                    cursor_pos_copy[0] = len(wrapped[-1])-(len(row)-cursor_pos_copy[0])
             else:
                 array_copy.append(row)
 
