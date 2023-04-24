@@ -6,7 +6,7 @@ desc = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="command_prompt",
-    version="1.0.7",
+    version="1.0.8",
     description="A copy of command prompt that allows you to easily make cli apps",
     long_description=desc,
     long_description_content_type="text/markdown",
