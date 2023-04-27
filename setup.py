@@ -34,4 +34,3 @@ setup(
     packages=find_packages(include=["command_prompt", "command_prompt.*"]),
 )
 
-
