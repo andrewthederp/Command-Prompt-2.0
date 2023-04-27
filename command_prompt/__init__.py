@@ -248,15 +248,18 @@ class Window:
                 continue
 
             if y >= len(self.array):
-                for _ in range((y-len(self.array))+1):
+                num = (y-len(self.array))+1
+                for _ in range(num):
                     self.array.append([])
-                    if len(self.array) > self.window_rows:
-                        self.row_offset += 1
-            while x >= len(self.array[y])+1:
+            num = x-len(self.array[y])+1
+            for _ in range(num):
                 self.array[y].append(Char("", self.current_ansi))
 
             try:
-                self.array[y].insert(x, Char(char, self.current_ansi))
+                if add:
+                    self.array[y].insert(x, Char(char, self.current_ansi))
+                else:
+                    self.array[y][x] = Char(char, self.current_ansi)
             except IndexError:
                 print(f"{x=}, {y=}, {self.array}")
             x += 1
@@ -603,14 +606,17 @@ class Window:
                             x = self.smaller['coor'][0]+self.smaller['row_offset']
                             text = ''.join(i.text for i in array_copy[x][self.smaller['coor'][1]+1:self.bigger['coor'][1]+(2 if (array_copy[x][0].text == '\n' or x == 0) else 1)]).replace('\n', '')
                         else:
-                            x = self.smaller['coor'][0]+self.smaller['row_offset']
-                            text += ''.join(i.text for i in array_copy[x][self.smaller['coor'][1]+1:self.window_columns]).replace('\n', '')
-                            text += '\n'
-                            for row in range(self.smaller['coor'][0]+1, self.bigger['coor'][0]):
-                                text += ''.join(i.text for i in array_copy[row]).replace('\n', '')
+                            try:
+                                x = self.smaller['coor'][0]+self.smaller['row_offset']
+                                text += ''.join(i.text for i in array_copy[x][self.smaller['coor'][1]+1:self.window_columns]).replace('\n', '')
                                 text += '\n'
-                            x = self.bigger['coor'][0]+self.bigger['row_offset']
-                            text += ''.join(i.text for i in array_copy[x][0:self.bigger['coor'][1]+(2 if (array_copy[x][0].text == '\n' or x == 0) else 1)]).replace('\n', '')
+                                for row in range(self.smaller['coor'][0]+1, self.bigger['coor'][0]):
+                                    text += ''.join(i.text for i in array_copy[row]).replace('\n', '')
+                                    text += '\n'
+                                x = self.bigger['coor'][0]+self.bigger['row_offset']
+                                text += ''.join(i.text for i in array_copy[x][0:self.bigger['coor'][1]+(2 if (array_copy[x][0].text == '\n' or x == 0) else 1)]).replace('\n', '')
+                            except IndexError:
+                                pass
                         pyperclip.copy(text)
 
                     if event.unicode:
