@@ -92,6 +92,8 @@ class Char:
                     self.foreground_color = BIT16_COLORS[int(ansi_code)-82]
                 elif ansi_code in range(40, 48):
                     self.background_color = BIT8_COLORS[int(ansi_code)-40]
+                elif ansi_code in range(100, 108):
+                    self.background_color = BIT16_COLORS[int(ansi_code)-92]
 
     def __repr__(self):
         return f'<char="{self.text}", foreground_color={self.foreground_color}>, background_color={self.background_color}'
@@ -144,6 +146,11 @@ class Window:
         self.repeat_rate = 25
 
         self.key_detected = False
+
+        # Selecting
+        self.current_select = {'coor':None, 'row_offset':self.row_offset}
+        self.pressing_down = False
+        self.smaller, self.bigger = {'coor': (-1, -1), 'row_offset':0}, {'coor': (-1, -1), 'row_offset':0}
 
 
     def create_cursors(self):
@@ -211,8 +218,7 @@ class Window:
     #     return ansi_code_positions
 
     def print(self, string, *, add=False):
-        """Print text to the console"""
-        
+        """Print text to the console"""        
         string = str(string)
         self.cursor_blinker = 60
         x, y = self.cursor_pos
@@ -240,10 +246,6 @@ class Window:
                 elif char.isdigit() or char == ';':
                     escape_sequence += char
                 continue
-
-            # if x >= self.window_columns:
-            #     y += 1
-            #     x = 0
 
             if y >= len(self.array):
                 for _ in range((y-len(self.array))+1):
@@ -414,6 +416,19 @@ class Window:
         for current_num in range(0, len(iterable), num):
             yield iterable[current_num:current_num+num]
 
+    def make_array_copy(self, cursor=None):
+        array_copy = []
+        for x, row in enumerate(self.array):
+            if len(row) >= self.window_columns-1:
+                wrapped = list(self.wrap(row, self.window_columns-2))
+                array_copy.extend(wrapped)
+                if cursor and cursor[1] == x and cursor[0] >= self.window_columns-1:
+                    cursor[1] += len(wrapped)-1
+                    cursor[0] = len(wrapped[-1])-(len(row)-cursor[0])
+            else:
+                array_copy.append(row)
+        return array_copy
+
     def update_screen(self):
         """Not meant to be used by the user"""
 
@@ -427,16 +442,7 @@ class Window:
         except IndexError:
             pass
 
-        array_copy = []
-        for x, row in enumerate(self.array):
-            if len(row) >= self.window_columns-1:
-                wrapped = list(self.wrap(row, self.window_columns-2))
-                array_copy.extend(wrapped)
-                if cursor_pos_copy[1] == x and cursor_pos_copy[0] >= self.window_columns-1:
-                    cursor_pos_copy[1] += len(wrapped)-1
-                    cursor_pos_copy[0] = len(wrapped[-1])-(len(row)-cursor_pos_copy[0])
-            else:
-                array_copy.append(row)
+        array_copy = self.make_array_copy(cursor_pos_copy)
 
         self.cursor_blinker -= 1
 
@@ -448,6 +454,34 @@ class Window:
 
         elif self.cursor_blinker <= -60:
             self.cursor_blinker = 60
+
+        mouse_pos = pygame.mouse.get_pos()
+
+        if self.pressing_down and mouse_pos != self.current_select['coor']: # change this to use the event instead
+            x, y = self.current_select['coor']
+            x = x//self.cell_size[0]
+            y = y//self.cell_size[1]
+
+            x_, y_ = mouse_pos
+            x_ = x_//self.cell_size[0]
+            y_ = y_//self.cell_size[1]
+
+            if y > y_:
+                self.bigger = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
+                self.smaller = {'coor': [y_, x_], 'row_offset':self.row_offset}
+            elif y < y_:
+                self.bigger = {'coor': [y_, x_], 'row_offset':self.row_offset}
+                self.smaller = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
+            else:
+                if x > x_:
+                    self.bigger = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
+                    self.smaller = {'coor': [y_, x_], 'row_offset':self.row_offset}
+                elif x < x_:
+                    self.bigger = {'coor': [y_, x_], 'row_offset':self.row_offset}
+                    self.smaller = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
+                else:
+                    self.bigger = {'coor': [y, x], 'row_offset':self.row_offset}
+                    self.smaller = {'coor': [y, x], 'row_offset':self.row_offset}
 
         for x in range(self.window_rows):
             x_offset = 0
@@ -477,12 +511,6 @@ class Window:
                     else:
                         font.set_underline(False)
 
-                    if char.text_formattings['invis']:
-                        background_rect = char_surface.get_rect(topleft=topleft)
-                        pygame.draw.rect(self.screen, char.background_color, background_rect)
-                        x_offset += self.cell_size[0]
-                        continue
-
                     if char.text_formattings['strikethrough']:
                         font.set_strikethrough(True)
                     else:
@@ -490,13 +518,36 @@ class Window:
 
                     background_rect = char_surface.get_rect(topleft=topleft)
                     pygame.draw.rect(self.screen, char.background_color, background_rect)
-                    self.screen.blit(char_surface, topleft)
+                    if not char.text_formattings['invis']:
+                        self.screen.blit(char_surface, topleft)
 
                     x_offset += self.cell_size[0]
                 except IndexError:
                     pass
 
-        
+        for x_pos in range(self.window_columns-2):
+            for y_pos in range(self.window_rows):
+                x = x_pos*self.cell_size[0]
+                y = y_pos*self.cell_size[1]
+                topleft = (x, y)
+                temp_surf = pygame.Surface(self.cell_size, pygame.SRCALPHA)
+                rect = pygame.Rect((0, 0), self.cell_size)
+                pygame.draw.rect(temp_surf, (255, 255, 255, 130), rect)
+
+
+                if self.smaller['coor'][0] == self.bigger['coor'][0]:
+                    if x_pos >= self.smaller['coor'][1] and x_pos <= self.bigger['coor'][1] and y_pos == (self.smaller['coor'][0]+self.smaller['row_offset'])-self.row_offset:
+                        self.screen.blit(temp_surf, topleft)
+                elif y_pos >= (self.smaller['coor'][0]+self.smaller['row_offset'])-self.row_offset and y_pos <= (self.bigger['coor'][0]+self.bigger['row_offset'])-self.row_offset:
+                    if y_pos == (self.smaller['coor'][0]+self.smaller['row_offset'])-self.row_offset:
+                        if x_pos >= self.smaller['coor'][1]:
+                            self.screen.blit(temp_surf, topleft)
+                    elif y_pos == (self.bigger['coor'][0]+self.bigger['row_offset'])-self.row_offset:
+                        if x_pos <= self.bigger['coor'][1]:
+                            self.screen.blit(temp_surf, topleft)
+                    else:
+                        self.screen.blit(temp_surf, topleft)
+
         rect = pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*2), 0), ((self.cell_size[0]*2), self.screen_dimensions[1]))
         pygame.draw.rect(self.screen, (37, 37, 37), rect)
 
@@ -526,7 +577,45 @@ class Window:
                 if event.type == pygame.QUIT:
                     self.running = False
                 if event.type == pygame.MOUSEWHEEL and len(self.array) >= self.window_rows:
-                    self.row_offset = min(max(0, self.row_offset+(-2*event.y)), len(self.array)-self.window_rows)
+                    self.row_offset = min(max(0, self.row_offset+(-2*event.y)), (sum(len(list(self.wrap(row, self.window_columns))) for row in self.array))-self.window_rows)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self.smaller, self.bigger = {'coor': (-1, -1), 'row_offset':0}, {'coor': (-1, -1), 'row_offset':0}
+                    self.current_select = {'coor':event.pos, 'row_offset':self.row_offset}
+                    self.pressing_down = True
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    self.pressing_down = False
+                if event.type == pygame.KEYDOWN:
+                    if self.current_select and not self.pressing_down and event.mod % pygame.K_LSHIFT:
+                        if event.key == pygame.K_LEFT:
+                            self.bigger['coor'][1] -= 1
+                            if self.bigger['coor'][1] == -1:
+                                self.bigger['coor'][0] -= 1
+                                self.bigger['coor'][1] = self.window_columns-3
+                        elif event.key == pygame.K_RIGHT:
+                            self.bigger['coor'][1] += 1
+                            if self.bigger['coor'][1] == self.window_columns-2:
+                                self.bigger['coor'][0] += 1
+                                self.bigger['coor'][1] = 0
+                    if event.key == pygame.K_c and event.mod % pygame.K_LCTRL: # TODO: if you try to copy the the first character in a line that does not have '\n' as the first character. It won't copy
+                        text = ''
+                        array_copy = self.make_array_copy()
+                        if self.smaller['coor'][0] == self.bigger['coor'][0]:
+                            x = self.smaller['coor'][0]+self.smaller['row_offset']
+                            text = ''.join(i.text for i in array_copy[x][self.smaller['coor'][1]+1:self.bigger['coor'][1]+(2 if (array_copy[x][0].text == '\n' or x == 0) else 1)]).replace('\n', '')
+                        else:
+                            x = self.smaller['coor'][0]+self.smaller['row_offset']
+                            text += ''.join(i.text for i in array_copy[x][self.smaller['coor'][1]+1:self.window_columns]).replace('\n', '')
+                            text += '\n'
+                            for row in range(self.smaller['coor'][0]+1, self.bigger['coor'][0]):
+                                text += ''.join(i.text for i in array_copy[row]).replace('\n', '')
+                                text += '\n'
+                            x = self.bigger['coor'][0]+self.bigger['row_offset']
+                            text += ''.join(i.text for i in array_copy[x][0:self.bigger['coor'][1]+(2 if (array_copy[x][0].text == '\n' or x == 0) else 1)]).replace('\n', '')
+                        pyperclip.copy(text)
+
+                    if event.unicode:
+                        self.smaller, self.bigger = {'coor': (-1, -1), 'row_offset':0}, {'coor': (-1, -1), 'row_offset':0}
+
 
             self.update_screen()
             self.clock.tick(self.FPS)
