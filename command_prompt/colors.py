@@ -23,7 +23,7 @@ LIGHT_WHITE  = (242, 242, 242)
 BIT16_COLORS = {8:LIGHT_BLACK, 9:LIGHT_RED, 10:LIGHT_GREEN, 11:LIGHT_YELLOW, 12:LIGHT_BLUE, 13:LIGHT_PURPLE, 14:LIGHT_CYAN, 15:LIGHT_WHITE}
 BIT16_COLORS.update(BIT8_COLORS)
 
-# I had to make this manually because I couldn't make an alogirthm
+# I had to make this manually because I couldn't make an algorithm
 BIT256_COLORS = {
 	16: (0, 0, 0),
 	17: (0, 0, 95),
