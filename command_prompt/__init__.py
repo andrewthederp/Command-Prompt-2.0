@@ -17,6 +17,16 @@ class CursorShape:
     EMPTY             = 5
     INVISIBLE         = 6
 
+class ScrollBar:
+    def __init__(self, *, collide_rect):
+        self.collide_rect = collide_rect
+        self.offset = 0
+
+    def update(self, *, events, total_length, offset_num, min_rows):
+        for event in events:
+            if event.type == pygame.MOUSEWHEEL and total_length > min_rows:
+                self.offset = min(max(0, self.offset+(-offset_num*event.y)), total_length)
+
 class Char:
     def __init__(self, char, ansi):
         self.text = char
@@ -126,9 +136,9 @@ class Window:
 
         self.events = []
 
-        self.row_offset = 0
-
         self.word_delimiters = " /\()\"'-.,:;<>~!@#$%^&*|+=[]{}~?│ "
+
+        self.scrollbar = ScrollBar(collide_rect=pygame.Rect((0, 0), self.screen_dimensions))
 
         # controlling the cursor
         self.cursor_pos = [0, 0]
@@ -148,49 +158,49 @@ class Window:
         self.key_detected = False
 
         # Selecting
-        self.current_select = {'coor':None, 'row_offset':self.row_offset}
+        self.current_select = {'coor':None, 'row_offset':self.scrollbar.offset}
         self.pressing_down = False
-        self.smaller, self.bigger = {'coor': (-1, -1), 'row_offset':0}, {'coor': (-1, -1), 'row_offset':0}
+        self.smaller, self.bigger = {'coor': [-1, -1], 'row_offset':0}, {'coor': [-1, -1], 'row_offset':0}
 
 
     def create_cursors(self):
         """Not meant to be used by the user"""
         w, h = self.cell_size
 
-        vintage_cursor_surface = pygame.Surface((w, h))
-        vintage_cursor_surface.fill(DEFAULT_BACKGROUND)
+        vintage_cursor_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+        vintage_cursor_surface.fill((0,0,0,0))
         vintage_cursor = pygame.Rect((0, h-(h/4)), (w, h/4))
         pygame.draw.rect(vintage_cursor_surface, DEFAULT_CURSOR, vintage_cursor)
 
-        bar_cursor_surface = pygame.Surface((w, h))
-        bar_cursor_surface.fill(DEFAULT_BACKGROUND)
+        bar_cursor_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+        bar_cursor_surface.fill((0,0,0,0))
         bar_cursor = pygame.Rect((0, 0), (1, h))
         pygame.draw.rect(bar_cursor_surface, DEFAULT_CURSOR, bar_cursor)
 
-        underscore_cursor_surface = pygame.Surface((w, h))
-        underscore_cursor_surface.fill(DEFAULT_BACKGROUND)
+        underscore_cursor_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+        underscore_cursor_surface.fill((0,0,0,0))
         underscore_cursor = pygame.Rect((0, h-1), (w, 1))
         pygame.draw.rect(underscore_cursor_surface, DEFAULT_CURSOR, underscore_cursor)
 
-        double_underscore_cursor_surface = pygame.Surface((w, h))
-        double_underscore_cursor_surface.fill(DEFAULT_BACKGROUND)
+        double_underscore_cursor_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+        double_underscore_cursor_surface.fill((0,0,0,0))
         double_underscore_cursor1 = pygame.Rect((0, h-1), (w, 1))
         double_underscore_cursor2 = pygame.Rect((0, h-3), (w, 1))
         pygame.draw.rect(double_underscore_cursor_surface, DEFAULT_CURSOR, double_underscore_cursor1)
         pygame.draw.rect(double_underscore_cursor_surface, DEFAULT_CURSOR, double_underscore_cursor2)
 
-        filled_cursor_surface = pygame.Surface((w, h))
-        filled_cursor_surface.fill(DEFAULT_BACKGROUND)
+        filled_cursor_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+        filled_cursor_surface.fill((0,0,0,0))
         filled_cursor = pygame.Rect((0, 0), (w, h))
         pygame.draw.rect(filled_cursor_surface, DEFAULT_CURSOR, filled_cursor)
 
-        empty_cursor_surface = pygame.Surface((w, h))
-        empty_cursor_surface.fill(DEFAULT_BACKGROUND)
+        empty_cursor_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+        empty_cursor_surface.fill((0,0,0,0))
         empty_cursor = pygame.Rect((0, 0), (w, h))
         pygame.draw.rect(empty_cursor_surface, DEFAULT_CURSOR, empty_cursor, 2)
 
-        invis_cursor_surface = pygame.Surface((w, h))
-        invis_cursor_surface.fill(DEFAULT_BACKGROUND)
+        invis_cursor_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+        invis_cursor_surface.fill((0,0,0,0))
         invis_cursor = pygame.Rect((0, 0), (0, 0))
         pygame.draw.rect(invis_cursor_surface, DEFAULT_CURSOR, invis_cursor)
 
@@ -360,7 +370,7 @@ class Window:
                 x, y = self.cursor_pos
 
                 if self.current_button['key'] == 8:
-                    if user_text:
+                    if user_text[:x-starting_x]:
                         if self.current_button['mod'] == 4160:
                             try:
                                 if user_text[(x-starting_x)-1] in self.word_delimiters:
@@ -382,12 +392,14 @@ class Window:
                 elif self.current_button['key'] == 1073741903:
                     self.cursor_blinker = 60
                     if x+1 <= len(user_text)+starting_x:
-                        self.move_cursor_to(x+1, y)
+                        # self.move_cursor_to(x+1, y)
+                        self.cursor_pos = [x+1, y]
 
                 elif self.current_button['key'] == 1073741904:
                     self.cursor_blinker = 60
                     if x-1 >= starting_x:
-                        self.move_cursor_to(x-1, y)
+                        # self.move_cursor_to(x-1, y)
+                        self.cursor_pos = [x-1, y]
 
                 elif self.current_button['unicode'] == '\x16':
                     for char in pyperclip.paste():
@@ -423,7 +435,7 @@ class Window:
         array_copy = []
         for x, row in enumerate(self.array):
             if len(row) >= self.window_columns-1:
-                wrapped = list(self.wrap(row, self.window_columns-2))
+                wrapped = list(self.wrap(row, self.window_columns-1))
                 array_copy.extend(wrapped)
                 if cursor and cursor[1] == x and cursor[0] >= self.window_columns-1:
                     cursor[1] += len(wrapped)-1
@@ -447,17 +459,6 @@ class Window:
 
         array_copy = self.make_array_copy(cursor_pos_copy)
 
-        self.cursor_blinker -= 1
-
-        if self.cursor_blinker >= 0:
-            cursor_surface = self.cursors[self.cursor]
-            x = self.cell_size[0] * cursor_pos_copy[0]
-            y = self.cell_size[1] * cursor_pos_copy[1]
-            self.screen.blit(cursor_surface, (x, y))
-
-        elif self.cursor_blinker <= -60:
-            self.cursor_blinker = 60
-
         mouse_pos = pygame.mouse.get_pos()
 
         if self.pressing_down and mouse_pos != self.current_select['coor']: # change this to use the event instead
@@ -471,26 +472,31 @@ class Window:
 
             if y > y_:
                 self.bigger = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
-                self.smaller = {'coor': [y_, x_], 'row_offset':self.row_offset}
+                self.smaller = {'coor': [y_, x_], 'row_offset':self.scrollbar.offset}
             elif y < y_:
-                self.bigger = {'coor': [y_, x_], 'row_offset':self.row_offset}
+                self.bigger = {'coor': [y_, x_], 'row_offset':self.scrollbar.offset}
                 self.smaller = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
             else:
                 if x > x_:
                     self.bigger = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
-                    self.smaller = {'coor': [y_, x_], 'row_offset':self.row_offset}
+                    self.smaller = {'coor': [y_, x_], 'row_offset':self.scrollbar.offset}
                 elif x < x_:
-                    self.bigger = {'coor': [y_, x_], 'row_offset':self.row_offset}
+                    self.bigger = {'coor': [y_, x_], 'row_offset':self.scrollbar.offset}
                     self.smaller = {'coor': [y, x], 'row_offset': self.current_select['row_offset']}
                 else:
-                    self.bigger = {'coor': [y, x], 'row_offset':self.row_offset}
-                    self.smaller = {'coor': [y, x], 'row_offset':self.row_offset}
+                    self.bigger = {'coor': [y, x], 'row_offset':self.scrollbar.offset}
+                    self.smaller = {'coor': [y, x], 'row_offset':self.scrollbar.offset}
+
+            if self.smaller['coor'][0] <= -1:
+                self.scrollbar.offset = max(self.scrollbar.offset+self.smaller['coor'][0], 0)
+            elif self.bigger['coor'][0] >= self.window_rows+1:
+                self.scrollbar.offset = min(self.scrollbar.offset+self.bigger['coor'][0], len(self.array)-self.window_rows)
 
         for x in range(self.window_rows):
             x_offset = 0
             for y in range(self.window_columns):
                 try:
-                    char = array_copy[x+self.row_offset][y]
+                    char = array_copy[x+self.scrollbar.offset][y]
                     if char.text == '\n':
                         continue
                     if char.text_formattings['bold'] and char.text_formattings['italic']:
@@ -528,6 +534,17 @@ class Window:
                 except IndexError:
                     pass
 
+        self.cursor_blinker -= 1
+
+        if self.cursor_blinker >= 0:
+            cursor_surface = self.cursors[self.cursor]
+            x = self.cell_size[0] * cursor_pos_copy[0]
+            y = self.cell_size[1] * (cursor_pos_copy[1]-self.scrollbar.offset)
+            self.screen.blit(cursor_surface, (x, y))
+
+        elif self.cursor_blinker <= -60:
+            self.cursor_blinker = 60
+
         for x_pos in range(self.window_columns-2):
             for y_pos in range(self.window_rows):
                 x = x_pos*self.cell_size[0]
@@ -539,17 +556,18 @@ class Window:
 
 
                 if self.smaller['coor'][0] == self.bigger['coor'][0]:
-                    if x_pos >= self.smaller['coor'][1] and x_pos <= self.bigger['coor'][1] and y_pos == (self.smaller['coor'][0]+self.smaller['row_offset'])-self.row_offset:
+                    if x_pos >= self.smaller['coor'][1] and x_pos <= self.bigger['coor'][1] and y_pos == (self.smaller['coor'][0]+self.smaller['row_offset'])-self.scrollbar.offset:
                         self.screen.blit(temp_surf, topleft)
-                elif y_pos >= (self.smaller['coor'][0]+self.smaller['row_offset'])-self.row_offset and y_pos <= (self.bigger['coor'][0]+self.bigger['row_offset'])-self.row_offset:
-                    if y_pos == (self.smaller['coor'][0]+self.smaller['row_offset'])-self.row_offset:
+                elif y_pos >= (self.smaller['coor'][0]+self.smaller['row_offset'])-self.scrollbar.offset and y_pos <= (self.bigger['coor'][0]+self.bigger['row_offset'])-self.scrollbar.offset:
+                    if y_pos == (self.smaller['coor'][0]+self.smaller['row_offset'])-self.scrollbar.offset:
                         if x_pos >= self.smaller['coor'][1]:
                             self.screen.blit(temp_surf, topleft)
-                    elif y_pos == (self.bigger['coor'][0]+self.bigger['row_offset'])-self.row_offset:
+                    elif y_pos == (self.bigger['coor'][0]+self.bigger['row_offset'])-self.scrollbar.offset:
                         if x_pos <= self.bigger['coor'][1]:
                             self.screen.blit(temp_surf, topleft)
                     else:
                         self.screen.blit(temp_surf, topleft)
+
 
         rect = pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*2), 0), ((self.cell_size[0]*2), self.screen_dimensions[1]))
         pygame.draw.rect(self.screen, (37, 37, 37), rect)
@@ -558,7 +576,7 @@ class Window:
             perc = self.window_rows/len(array_copy)
             length = self.screen_dimensions[1]*perc
 
-            pos = self.row_offset/len(array_copy)
+            pos = self.scrollbar.offset/len(array_copy)
             pos = pos*self.screen_dimensions[1]
 
             rect = pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*2), pos), (self.cell_size[0]*2, length))
@@ -576,14 +594,16 @@ class Window:
     def loop(self):
         while self.running:
             self.events = pygame.event.get()
+
+            total_length = (sum(len(list(self.wrap(row, self.window_columns))) for row in self.array))-self.window_rows
+            self.scrollbar.update(events=self.events, total_length=total_length, offset_num=2, min_rows=0)
+
             for event in self.events:
                 if event.type == pygame.QUIT:
                     self.running = False
-                if event.type == pygame.MOUSEWHEEL and len(self.array) >= self.window_rows:
-                    self.row_offset = min(max(0, self.row_offset+(-2*event.y)), (sum(len(list(self.wrap(row, self.window_columns))) for row in self.array))-self.window_rows)
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self.smaller, self.bigger = {'coor': (-1, -1), 'row_offset':0}, {'coor': (-1, -1), 'row_offset':0}
-                    self.current_select = {'coor':event.pos, 'row_offset':self.row_offset}
+                    self.smaller, self.bigger = {'coor': [-1, -1], 'row_offset':0}, {'coor': [-1, -1], 'row_offset':0}
+                    self.current_select = {'coor':event.pos, 'row_offset':self.scrollbar.offset}
                     self.pressing_down = True
                 if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     self.pressing_down = False
@@ -620,7 +640,7 @@ class Window:
                         pyperclip.copy(text)
 
                     if event.unicode:
-                        self.smaller, self.bigger = {'coor': (-1, -1), 'row_offset':0}, {'coor': (-1, -1), 'row_offset':0}
+                        self.smaller, self.bigger = {'coor': [-1, -1], 'row_offset':0}, {'coor': [-1, -1], 'row_offset':0}
 
 
             self.update_screen()
