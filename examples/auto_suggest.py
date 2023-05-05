@@ -1,5 +1,5 @@
-from main import Window
-from main import CursorShape
+from command_prompt import Window
+from command_prompt import CursorShape
 import time, pyperclip, pygame, copy
 
 window = Window()
