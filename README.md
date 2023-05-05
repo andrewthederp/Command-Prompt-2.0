@@ -37,10 +37,11 @@ We welcome contributions to this project, and we appreciate your help improving 
 # TODO
 - [x] Add support for more ansi codes
 - [ ] Add support for window re-sizing
-- [ ] Allow for more customizability
-- [ ] Make the scrollbar better
+- [x] Allow for more customizability
+- [ ] Allow for even more customizability
+- [x] Make the scrollbar better
 - [x] Add mouse selection
-- [ ] Improve mouse selection
+- [x] Improve mouse selection
 - [ ] Add hyperlinks and press-able text that execute functions
 
 # Credits
