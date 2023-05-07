@@ -35,6 +35,7 @@ We welcome contributions to this project, and we appreciate your help improving 
 * We will review your changes and merge them if they are appropriate.
 
 # TODO
+- [ ] Make it use gpu instead of cpu
 - [x] Add support for more ansi codes
 - [ ] Add support for window re-sizing
 - [x] Allow for more customizability
