@@ -4,7 +4,7 @@ import os
 themes = {}
 
 current_directory = os.getcwd()
-with open(os.path.join(current_directory, 'themes.json') as f:
+with open(os.path.join(current_directory, 'themes.json')) as f:
 	themes = json.load(f)
 
 BLACK  = (12, 12, 12)
