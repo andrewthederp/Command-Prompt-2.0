@@ -57,6 +57,6 @@ BIT256_COLORS.update(BIT16_COLORS)
 
 def bit256_color_converter(num):
 	if num not in range(256):
-		raise ValueError
+		raise ValueError(str(num) + " is not in range 256")
 
 	return BIT256_COLORS[num]

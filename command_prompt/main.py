@@ -1,3 +1,5 @@
+import pygame._sdl2 as sdl2
+import ctypes.util
 import threading
 import pyperclip
 import pygame
@@ -5,8 +7,67 @@ import copy
 import os
 
 from colors import *
+from helper import *
 
 pygame.init()
+
+class Ansi:
+    RESET = '\033[0m'
+
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    ITALIC = '\033[3m'
+    UNDERLINE = '\033[4m'
+    BLINKING = '\033[5m'
+    FAST_BLINKING = '\033[6m'
+    REVERSE = '\033[7m'
+    INVIS = '\033[8m'
+    STRIKETHROUGH = '\033[9m'
+
+    FG_BLACK = '\033[30m'
+    FG_RED = '\033[31m'
+    FG_GREEN = '\033[32m'
+    FG_YELLOW = '\033[33m'
+    FG_BLUE = '\033[34m'
+    FG_PURPLE = '\033[35m'
+    FG_CYAN = '\033[36m'
+    FG_WHITE = '\033[37m'
+
+    BG_BLACK = '\033[40m'
+    BG_RED = '\033[41m'
+    BG_GREEN = '\033[42m'
+    BG_YELLOW = '\033[43m'
+    BG_BLUE = '\033[44m'
+    BG_PURPLE = '\033[45m'
+    BG_CYAN = '\033[46m'
+    BG_WHITE = '\033[47m'
+
+    FG_BRIGHT_BLACK = '\033[90m'
+    FG_BRIGHT_RED = '\033[91m'
+    FG_BRIGHT_GREEN = '\033[92m'
+    FG_BRIGHT_YELLOW = '\033[93m'
+    FG_BRIGHT_BLUE = '\033[94m'
+    FG_BRIGHT_PURPLE = '\033[95m'
+    FG_BRIGHT_CYAN = '\033[96m'
+    FG_BRIGHT_WHITE = '\033[97m'
+
+    BG_BRIGHT_BLACK = '\033[100m'
+    BG_BRIGHT_RED = '\033[101m'
+    BG_BRIGHT_GREEN = '\033[102m'
+    BG_BRIGHT_YELLOW = '\033[103m'
+    BG_BRIGHT_BLUE = '\033[104m'
+    BG_BRIGHT_PURPLE = '\033[105m'
+    BG_BRIGHT_CYAN = '\033[106m'
+    BG_BRIGHT_WHITE = '\033[107m'
+
+    def ansi_256bit(number, foreground=True):
+        return f"\033{38 if foreground else 48};5;{number}m"
+
+    def ansi_rgb(rgb, foreground=True):
+        return f"\033{38 if foreground else 48};2;{';'.join([str(clr) for clr in rgb])}m"
+
+    def ansi_hyperlink(link, text):
+        return f"\a{link}\a{text}\a"
 
 class CursorShape:
     VINTAGE           = 0
@@ -47,20 +108,37 @@ class ScrollBar:
             pygame.draw.rect(screen, (135, 135, 135), self.scrollbar_rect, border_radius=3)
 
 class Char:
+    blinking_timer = 60
+    fast_blinking_timer = 30
+
     def __init__(self, char, ansi, theme):
         self.text = char
         self.ansi = copy.deepcopy(ansi)
         self.text_formattings = {
-            'bold':          False,
-            'dim':           False,
-            'italic':        False,
-            'underline':     False,
-            'blinking':      False,
-            'invis':         False,
-            'strikethrough': False
+            'bold':               False,
+            'dim':                False,
+            'italic':             False,
+            'underline':          False,
+            'blinking':           False,
+            'fast_blinking':      False,
+            'invis':              False,
+            'strikethrough':      False
+        }
+
+        self.on_hover = {
+            'bold':               False,
+            'dim':                False,
+            'italic':             False,
+            'underline':          False,
+            'blinking':           False,
+            'fast_blinking':      False,
+            'invis':              False,
+            'strikethrough':      False
         }
 
         self.apply_ansi(theme)
+
+        self.on_click_args = []
 
 
     def apply_ansi(self, theme):
@@ -68,31 +146,65 @@ class Char:
         self.foreground_color = themes[theme.lower()]['foreground']
         self.background_color = themes[theme.lower()]['background']
 
-        for ansi_code in self.ansi:
-            if ansi_code.startswith('38;2;'):
+        ansi_codes_copy = copy.deepcopy(self.ansi)
+
+        for num, ansi_code in enumerate(ansi_codes_copy):
+            if all((ansi_code=='2', num>0, self.ansi[num-1]=='38')):
+                r, g, b = None, None, None
                 try:
-                    _, _, r, g, b = ansi_code.split(';')
-                except ValueError:
-                    pass
-                else:
-                    self.foreground_color = (int(r), int(g), int(b))
-            if ansi_code.startswith('48;2;'):
+                    r = ansi_codes_copy.pop(num+1)
+                except IndexError:
+                    r, g, b = 0, 0, 0
+
+                if g is None:
+                    try:
+                        g = ansi_codes_copy.pop(num+1)
+                    except IndexError:
+                        g, b = 0, 0
+
+                if b is None:
+                    try:
+                        b = ansi_codes_copy.pop(num+1)
+                    except IndexError:
+                        b = 0
+
+                self.foreground_color = (int(r), int(g), int(b))
+            elif all((ansi_code=='2', num>0, self.ansi[num-1]=='48')):
+                r, g, b = None, None, None
                 try:
-                    _, _, r, g, b = ansi_code.split(';')
-                except ValueError:
-                    pass
-                else:
-                    self.background_color = (int(r), int(g), int(b))
-            elif ansi_code.startswith('38;5;'):
+                    r = ansi_codes_copy.pop(num+1)
+                except IndexError:
+                    r, g, b = 0, 0, 0
+
+                if g is None:
+                    try:
+                        g = ansi_codes_copy.pop(num+1)
+                    except IndexError:
+                        g, b = 0, 0
+
+                if b is None:
+                    try:
+                        b = ansi_codes_copy.pop(num+1)
+                    except IndexError:
+                        b = 0
+
+                self.background_color = (int(r), int(g), int(b))
+            elif all((ansi_code=='5', num>0, self.ansi[num-1]=='38')):
+                clr_num = 0
                 try:
-                    self.foreground_color = bit256_color_converter(int(ansi_code.split(';')[-1]))
-                except ValueError:
+                    clr_num = ansi_codes_copy.pop(num + 1)
+                except IndexError:
                     pass
-            elif ansi_code.startswith('48;5;'):
+
+                self.foreground_color = bit256_color_converter(int(clr_num))
+            elif all((ansi_code=='5', num>0, self.ansi[num-1]=='48')):
+                clr_num = 0
                 try:
-                    self.background_color = bit256_color_converter(int(ansi_code.split(';')[-1]))
-                except ValueError:
+                    clr_num = ansi_codes_copy.pop(num + 1)
+                except IndexError:
                     pass
+
+                self.background_color = bit256_color_converter(int(clr_num))
             elif ansi_code == '1':
                 self.text_formattings['bold'] = True
             elif ansi_code == '2':
@@ -104,7 +216,7 @@ class Char:
             elif ansi_code == '5':
                 self.text_formattings['blinking'] = True
             elif ansi_code == '6':
-                self.text_formattings['blinking'] = True
+                self.text_formattings['fast_blinking'] = True
             elif ansi_code == '7':
                 fg = copy.deepcopy(self.foreground_color)
                 bg = copy.deepcopy(self.background_color)
@@ -135,6 +247,9 @@ class Char:
     def change_theme(self, theme):
         self.apply_ansi(theme)
 
+    def on_click(_, __):
+        ...
+
 
 class Window:
     def __init__(self, *, caption="Command prompt 2.0", theme='Campbell'):
@@ -154,8 +269,11 @@ class Window:
         self.window_columns = 120
         self.window_rows = 30
         self.screen_dimensions = (self.window_columns * self.cell_size[0] + 10, self.window_rows * self.cell_size[1])
-        self.screen = pygame.display.set_mode(self.screen_dimensions)
+        self.screen = pygame.display.set_mode(self.screen_dimensions, pygame.RESIZABLE)
         self.theme = theme
+
+        self.window = sdl2.Window.from_display_module()
+        self.renderer = sdl2.Renderer(self.window)
 
         # .
         self.running = True
@@ -171,6 +289,10 @@ class Window:
             collide_rect=pygame.Rect((0, 0), self.screen_dimensions),
             slider_rect=pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*1.8), 0), ((self.cell_size[0]*1.9), self.screen_dimensions[1]))
         )
+
+        SDL2 = ctypes.CDLL(os.path.dirname(pygame.__file__) + '\SDL2.dll')
+        SDL2.SDL_GetWindowFromID.restype = ctypes.POINTER(type('SDL_Window', (ctypes.Structure,), {}))
+        SDL2.SDL_SetWindowMinimumSize(SDL2.SDL_GetWindowFromID(1), self.cell_size[0]*57, self.cell_size[1])
 
         # controlling the cursor
         self.cursor_pos = [0, 0]
@@ -263,6 +385,12 @@ class Window:
         escape_sequence = ''
         escape_sequence_start = 0
 
+        in_hyperlink_escape_sequence = False
+        hyperlink_escape_sequence_start = 0
+        found_link = False
+        link = ''
+        text = ''
+
         for coor, char in enumerate(string):
             if char == '\n':
                 x = 0
@@ -272,15 +400,45 @@ class Window:
                 escape_sequence = ''
                 escape_sequence_start = coor
                 continue
+            elif char == '\a':
+                if not in_hyperlink_escape_sequence:
+                    in_hyperlink_escape_sequence = True
+                    hyperlink_escape_sequence_start = coor
+                    continue
+                elif not found_link:
+                    found_link = True
+                    continue
+                elif found_link:
+                    in_hyperlink_escape_sequence = False
+                    char = copy.copy(text)
+                    text = ''
             elif in_escape_sequence:
                 if char in "mK":
-                    if escape_sequence != '0' and escape_sequence not in self.current_ansi:
-                        self.current_ansi.append(escape_sequence)
-                    else:
+                    ansi_codes = escape_sequence.split(';')
+
+                    for num, code in enumerate(ansi_codes):
+                        if not code:
+                            ansi_codes[num] = '0'
+
+                    if '0' in ansi_codes:
                         self.current_ansi = []
+                        index = ansi_codes.index('0', -1)
+                        if index>0 and ansi_codes[index-1] in ['38', '48']:
+                            ansi_codes = ansi_codes[index+1:]
+                    
+                    for ansi_code in ansi_codes:
+                        # if ansi_code not in self.current_ansi: # This new system forces me to disable this check which may cause lag... A better system is due
+                        self.current_ansi.append(ansi_code)
+
                     in_escape_sequence = False
                 elif char.isdigit() or char == ';':
                     escape_sequence += char
+                continue
+            elif in_hyperlink_escape_sequence and not found_link:
+                link += char
+                continue
+            elif in_hyperlink_escape_sequence and found_link:
+                text += char
                 continue
 
             if y >= len(self.array):
@@ -292,13 +450,21 @@ class Window:
                 self.array[y].append(Char("", self.current_ansi, self.theme))
 
             try:
+                char = Char(char, self.current_ansi, self.theme)
+                if found_link:
+                    char.on_hover['underline'] = True
+                    char.on_click = open_website
+                    char.on_click_args = [link]
+                    found_link = False
+                    link = ''
+
                 if add:
-                    self.array[y].insert(x, Char(char, self.current_ansi, self.theme))
+                    self.array[y].insert(x, char)
                 else:
-                    self.array[y][x] = Char(char, self.current_ansi, self.theme)
+                    self.array[y][x] = char
             except IndexError:
                 print(f"{x=}, {y=}, {self.array}")
-            x += 1
+            x += len(char.text)
 
         self.cursor_pos[0], self.cursor_pos[1] = x, y
         if y not in range(self.scrollbar.offset, self.scrollbar.offset+self.window_rows):
@@ -502,6 +668,11 @@ class Window:
 
         mouse_pos = pygame.mouse.get_pos()
 
+        clicked = False
+        for event in self.events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                clicked = True
+
         if self.pressing_down and mouse_pos != self.current_select['coor']: # change this to use the event instead
             x, y = self.current_select['coor']
             x = x//self.cell_size[0]
@@ -533,6 +704,14 @@ class Window:
             elif self.bigger['coor'][0] >= self.window_rows+1:
                 self.scrollbar.offset = min(self.scrollbar.offset+self.bigger['coor'][0], len(self.array)-self.window_rows)
 
+        Char.blinking_timer -= 1
+        Char.fast_blinking_timer -= 1
+
+        if Char.blinking_timer <= -60:
+            Char.blinking_timer = 60
+        if Char.fast_blinking_timer <= -30:
+            Char.fast_blinking_timer = 30
+
         for x in range(self.window_rows):
             x_offset = 0
             for y in range(self.window_columns):
@@ -549,29 +728,28 @@ class Window:
                     else:
                         font = self.default_font
 
-                    # if char.text_formattings['dim']: # idk how dim works
-                    #     r, g, b = char.foreground_color
-                    #     char.foreground_color = (r//2, g//2, b//2)
+                    fg_color = char.foreground_color
+                    if char.text_formattings['dim'] or (char.text_formattings['fast_blinking'] and Char.fast_blinking_timer >= 0) or (char.text_formattings['blinking'] and Char.blinking_timer >= 0):
+                        r, g, b = fg_color
+                        fg_color = (r//2, g//2, b//2)
 
-                    char_surface = font.render(char.text, True, char.foreground_color)
+                    char_surface = font.render(char.text, True, fg_color)
                     topleft = (x_offset, self.cell_size[1]*x)
+                    background_rect = char_surface.get_rect(topleft=topleft)
 
-                    if char.text_formattings['underline']:
-                        font.set_underline(True)
-                    else:
-                        font.set_underline(False)
+                    if char.text_formattings['underline'] or (char.on_hover['underline'] and background_rect.collidepoint(mouse_pos)):
+                        underline(char_surface, color=fg_color) # didn't like pygame's underline
 
                     if char.text_formattings['strikethrough']:
-                        font.set_strikethrough(True)
-                    else:
-                        font.set_strikethrough(False)
+                        strikethrough(char_surface, color=fg_color) # didn't like pygame's strikethrough
 
-                    background_rect = char_surface.get_rect(topleft=topleft)
+                    if clicked and background_rect.collidepoint(mouse_pos):
+                        char.on_click(char, *char.on_click_args)
                     pygame.draw.rect(self.screen, char.background_color, background_rect)
                     if not char.text_formattings['invis']:
                         self.screen.blit(char_surface, topleft)
 
-                    x_offset += self.cell_size[0]
+                    x_offset += self.cell_size[0]*len(char.text)
                 except IndexError:
                     pass
 
@@ -627,7 +805,7 @@ class Window:
 
             total_length = 0
             for row in self.array:
-                total_length += (len(row)//(self.window_columns-1))+1
+                total_length += (len([len(char.text) for char in row])//(self.window_columns-1))+1
             total_length -= self.window_rows
 
             self.scrollbar.update(events=self.events, total_length=total_length, offset_num=2, min_rows=self.window_rows, should_scroll=total_length > 0)
@@ -694,6 +872,18 @@ class Window:
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_LSHIFT:
                         self.shift_direction = -1
+
+                if event.type == pygame.VIDEORESIZE:
+                    width, height = event.size
+                    self.window_columns = width//self.cell_size[0]
+                    self.window_rows = height//self.cell_size[1]
+
+                    self.screen_dimensions = event.size
+
+                    self.scrollbar = ScrollBar(
+                        collide_rect=pygame.Rect((0, 0), self.screen_dimensions),
+                        slider_rect=pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*1.8), 0), ((self.cell_size[0]*1.9), self.screen_dimensions[1]))
+                    )
 
             self.update_screen()
             self.clock.tick(self.FPS)
