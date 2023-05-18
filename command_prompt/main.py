@@ -6,8 +6,8 @@ import pygame
 import copy
 import os
 
-from .colors import *
-from .helper import *
+from colors import *
+from helper import *
 
 pygame.init()
 
@@ -250,6 +250,10 @@ class Char:
     def on_click(_, __):
         ...
 
+class TerminalSize:
+    def __init__(self, *, columns, rows):
+        self.columns = columns
+        self.rows = rows
 
 class Window:
     def __init__(self, *, caption="Command prompt 2.0", theme='Campbell'):
@@ -320,6 +324,9 @@ class Window:
         for row in self.array:
             for char in row:
                 char.change_theme(theme)
+
+    def get_terminal_size(self):
+        return TerminalSize(rows=self.window_rows, columns=self.window_columns)
 
     def create_cursors(self):
         """Not meant to be used by the user"""
@@ -474,6 +481,9 @@ class Window:
                 self.scrollbar.offset = (y-self.window_rows)+1
 
             self.scrollbar.offset += x//self.window_columns
+
+    def clear(self):
+        self.array = [[]]
 
     def delete_text(self, amount=1):
         """Delete `amount` text from the console."""
