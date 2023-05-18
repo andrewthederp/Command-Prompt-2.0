@@ -1,7 +1,7 @@
 import json
 
 themes = {}
-with open('themes.json') as f:
+with open('./themes.json') as f:
 	themes = json.load(f)
 
 BLACK  = (12, 12, 12)
