@@ -262,10 +262,10 @@ class Window:
         self.FPS = 60
 
         # initialising the font. TODO: allow the user to load custom fonts
-        self.default_font = pygame.font.Font('./fonts/CascadiaCode.ttf', 20)
-        self.bold_default_font = pygame.font.Font('./fonts/CascadiaCode-Bold.ttf', 20)
-        self.italic_default_font = pygame.font.Font('./fonts/CascadiaCodeItalic.ttf', 20)
-        self.bold_italic_default_font = pygame.font.Font('./fonts/CascadiaCode-BoldItalic.ttf', 20)
+        self.default_font = pygame.font.Font(os.path.join(os.path.dirname(__file__), 'fonts', 'CascadiaCode.ttf'), 20)
+        self.bold_default_font = pygame.font.Font(os.path.join(os.path.dirname(__file__), 'fonts', 'CascadiaCode-Bold.ttf'), 20)
+        self.italic_default_font = pygame.font.Font(os.path.join(os.path.dirname(__file__), 'fonts', 'CascadiaCodeItalic.ttf'), 20)
+        self.bold_italic_default_font = pygame.font.Font(os.path.join(os.path.dirname(__file__), 'fonts', 'CascadiaCode-BoldItalic.ttf'), 20)
         self.cell_size = self.default_font.size('H')
 
 
