@@ -6,8 +6,8 @@ import pygame
 import copy
 import os
 
-from colors import *
-from helper import *
+from .colors import *
+from .helper import *
 
 pygame.init()
 
