@@ -2,7 +2,7 @@ import json
 import os
 
 themes = {}
-with open('./themes.json') as f:
+with open(os.path.join(os.path.dirname(__file__), 'themes.json')) as f:
 	themes = json.load(f)
 
 BLACK  = (12, 12, 12)
