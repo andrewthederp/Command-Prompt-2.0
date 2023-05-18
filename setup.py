@@ -28,7 +28,7 @@ setup(
     package_data={
         '': [
             'fonts/*',
-            'themes.json
+            'themes.json'
         ]
     },
     python_requires=">=3.7",
