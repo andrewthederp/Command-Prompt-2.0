@@ -6,7 +6,7 @@ desc = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="command_prompt",
-    version="1.2.6",
+    version="1.2.7",
     description="A copy of command prompt that allows you to easily make cli apps",
     long_description=desc,
     long_description_content_type="text/markdown",
@@ -27,7 +27,8 @@ setup(
     include_package_data=True,
     package_data={
         '': [
-            'fonts/*'
+            'fonts/*',
+            'themes.json
         ]
     },
     python_requires=">=3.7",
