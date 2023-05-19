@@ -483,6 +483,7 @@ class Window:
             self.scrollbar.offset += x//self.window_columns
 
     def clear(self):
+        self.cursor_pos = 0, 0
         self.array = [[]]
 
     def delete_text(self, amount=1):
