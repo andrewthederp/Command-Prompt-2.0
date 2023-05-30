@@ -1,3 +1,5 @@
+
+
 import pygame._sdl2 as sdl2
 import ctypes.util
 import threading
@@ -10,6 +12,8 @@ from .colors import *
 from .helper import *
 
 pygame.init()
+
+text_inputs = []
 
 class Ansi:
     RESET = '\033[0m'
@@ -102,10 +106,10 @@ class ScrollBar:
 
     def draw(self, screen, *, draw_scrollbar=True, draw_slider=True):
         if draw_slider:
-            pygame.draw.rect(screen, (40, 40, 40), self.slider_rect)
+            pygame.draw.rect(screen, (46, 46, 46), self.slider_rect)
 
         if draw_scrollbar:
-            pygame.draw.rect(screen, (135, 135, 135), self.scrollbar_rect, border_radius=3)
+            pygame.draw.rect(screen, (159, 159, 159), self.scrollbar_rect, border_radius=3)
 
 class Char:
     blinking_timer = 60
@@ -149,97 +153,98 @@ class Char:
         ansi_codes_copy = copy.deepcopy(self.ansi)
 
         for num, ansi_code in enumerate(ansi_codes_copy):
-            if all((ansi_code=='2', num>0, self.ansi[num-1]=='38')):
-                r, g, b = None, None, None
-                try:
-                    r = ansi_codes_copy.pop(num+1)
-                except IndexError:
-                    r, g, b = 0, 0, 0
-
-                if g is None:
+            match (ansi_code, num, self.ansi[num-1]):
+                case ('2', n, '38') if n > 0:
+                    r, g, b = None, None, None
                     try:
-                        g = ansi_codes_copy.pop(num+1)
+                        r = ansi_codes_copy.pop(num+1)
                     except IndexError:
-                        g, b = 0, 0
+                        r, g, b = 0, 0, 0
 
-                if b is None:
+                    if g is None:
+                        try:
+                            g = ansi_codes_copy.pop(num+1)
+                        except IndexError:
+                            g, b = 0, 0
+
+                    if b is None:
+                        try:
+                            b = ansi_codes_copy.pop(num+1)
+                        except IndexError:
+                            b = 0
+
+                    self.foreground_color = (int(r), int(g), int(b))
+                case ('2', n, '48') if n > 0:
+                    r, g, b = None, None, None
                     try:
-                        b = ansi_codes_copy.pop(num+1)
+                        r = ansi_codes_copy.pop(num+1)
                     except IndexError:
-                        b = 0
+                        r, g, b = 0, 0, 0
 
-                self.foreground_color = (int(r), int(g), int(b))
-            elif all((ansi_code=='2', num>0, self.ansi[num-1]=='48')):
-                r, g, b = None, None, None
-                try:
-                    r = ansi_codes_copy.pop(num+1)
-                except IndexError:
-                    r, g, b = 0, 0, 0
+                    if g is None:
+                        try:
+                            g = ansi_codes_copy.pop(num+1)
+                        except IndexError:
+                            g, b = 0, 0
 
-                if g is None:
+                    if b is None:
+                        try:
+                            b = ansi_codes_copy.pop(num+1)
+                        except IndexError:
+                            b = 0
+
+                    self.background_color = (int(r), int(g), int(b))
+                case ('5', n, '38') if n > 0:
+                    clr_num = 0
                     try:
-                        g = ansi_codes_copy.pop(num+1)
+                        clr_num = ansi_codes_copy.pop(num + 1)
                     except IndexError:
-                        g, b = 0, 0
+                        pass
 
-                if b is None:
+                    self.foreground_color = bit256_color_converter(int(clr_num))
+                case ('5', n, '48') if n > 0:
+                    clr_num = 0
                     try:
-                        b = ansi_codes_copy.pop(num+1)
+                        clr_num = ansi_codes_copy.pop(num + 1)
                     except IndexError:
-                        b = 0
+                        pass
 
-                self.background_color = (int(r), int(g), int(b))
-            elif all((ansi_code=='5', num>0, self.ansi[num-1]=='38')):
-                clr_num = 0
-                try:
-                    clr_num = ansi_codes_copy.pop(num + 1)
-                except IndexError:
-                    pass
+                    self.background_color = bit256_color_converter(int(clr_num))
+                case ('1', _, _):
+                    self.text_formattings['bold'] = True
+                case ('2', _, _):
+                    self.text_formattings['dim'] = True
+                case ('3', _, _):
+                    self.text_formattings['italic'] = True
+                case ('4', _, _):
+                    self.text_formattings['underline'] = True
+                case ('5', _, _):
+                    self.text_formattings['blinking'] = True
+                case ('6', _, _):
+                    self.text_formattings['fast_blinking'] = True
+                case ('7', _, _):
+                    fg = copy.deepcopy(self.foreground_color)
+                    bg = copy.deepcopy(self.background_color)
+                    self.background_color = fg
+                    self.foreground_color = bg
+                case ('8', _, _):
+                    self.text_formattings['invis'] = True
+                case ('9', _, _):
+                    self.text_formattings['strikethrough'] = True
+                case (_, _, _):
+                    try:
+                        ansi_code = int(ansi_code)
+                    except ValueError:
+                        continue
 
-                self.foreground_color = bit256_color_converter(int(clr_num))
-            elif all((ansi_code=='5', num>0, self.ansi[num-1]=='48')):
-                clr_num = 0
-                try:
-                    clr_num = ansi_codes_copy.pop(num + 1)
-                except IndexError:
-                    pass
-
-                self.background_color = bit256_color_converter(int(clr_num))
-            elif ansi_code == '1':
-                self.text_formattings['bold'] = True
-            elif ansi_code == '2':
-                self.text_formattings['dim'] = True
-            elif ansi_code == '3':
-                self.text_formattings['italic'] = True
-            elif ansi_code == '4':
-                self.text_formattings['underline'] = True
-            elif ansi_code == '5':
-                self.text_formattings['blinking'] = True
-            elif ansi_code == '6':
-                self.text_formattings['fast_blinking'] = True
-            elif ansi_code == '7':
-                fg = copy.deepcopy(self.foreground_color)
-                bg = copy.deepcopy(self.background_color)
-                self.background_color = fg
-                self.foreground_color = bg
-            elif ansi_code == '8':
-                self.text_formattings['invis'] = True
-            elif ansi_code == '9':
-                self.text_formattings['strikethrough'] = True
-            else:
-                try:
-                    ansi_code = int(ansi_code)
-                except ValueError:
-                    continue
-
-                if ansi_code in range(30, 38):
-                    self.foreground_color = themes[theme.lower()]["8bitcolors"][str(int(ansi_code)-30)]
-                elif ansi_code in range(90, 98):
-                    self.foreground_color = themes[theme.lower()]["16bitcolors"][str(int(ansi_code)-82)]
-                elif ansi_code in range(40, 48):
-                    self.background_color = themes[theme.lower()]["8bitcolors"][str(int(ansi_code)-40)]
-                elif ansi_code in range(100, 108):
-                    self.background_color = themes[theme.lower()]["16bitcolors"][str(int(ansi_code)-92)]
+                    if ansi_code in range(30, 38):
+                        self.foreground_color = themes[theme.lower()]["8bitcolors"][str(int(ansi_code)-30)]
+                    elif ansi_code in range(90, 98):
+                        self.foreground_color = themes[theme.lower()]["16bitcolors"][str(int(ansi_code)-82)]
+                    elif ansi_code in range(40, 48):
+                        self.background_color = themes[theme.lower()]["8bitcolors"][str(int(ansi_code)-40)]
+                    elif ansi_code in range(100, 108):
+                        self.background_color = themes[theme.lower()]["16bitcolors"][str(int(ansi_code)-92)]
 
     def __repr__(self):
         return f'<char="{self.text}", foreground_color={self.foreground_color}>, background_color={self.background_color}'
@@ -255,6 +260,42 @@ class TerminalSize:
         self.columns = columns
         self.rows = rows
 
+class TextInput:
+    def __init__(self, func, *, small_cooldown=25, cooldown=500, func_args={}):
+        global text_inputs
+
+        self.small_cooldown = small_cooldown
+        self.cooldown = cooldown
+
+        self.current_button = None
+
+        self.func = func
+        self.func_args = func_args
+
+        self.user_text = ''
+        self.getting_input = True
+
+        text_inputs.append(self)
+
+    def update(self, events):
+        first_click = False
+        for event in events:
+            if event.type == pygame.KEYUP:
+                self.current_button = None
+            if event.type == pygame.KEYDOWN:
+                if not self.current_button or (self.current_button['key'] != event.dict['key']):
+                    event.dict['next_press'] = pygame.time.get_ticks()
+                    self.current_button = event.dict
+                    first_click = True
+                    # break
+
+        if self.current_button and pygame.time.get_ticks() >= self.current_button['next_press']:
+            self.current_button['next_press'] = pygame.time.get_ticks() + (self.cooldown if first_click else self.small_cooldown)
+            self.user_text = self.func(self.current_button, self.user_text, self, **self.func_args)
+            if not self.getting_input:
+                text_inputs.remove(self)
+
+
 class Window:
     def __init__(self, *, caption="Command prompt 2.0", theme='Campbell'):
         # fps limiter
@@ -267,7 +308,6 @@ class Window:
         self.italic_default_font = pygame.font.Font(os.path.join(os.path.dirname(__file__), 'fonts', 'CascadiaCodeItalic.ttf'), 20)
         self.bold_italic_default_font = pygame.font.Font(os.path.join(os.path.dirname(__file__), 'fonts', 'CascadiaCode-BoldItalic.ttf'), 20)
         self.cell_size = self.default_font.size('H')
-
 
         # window settings
         self.window_columns = 120
@@ -306,12 +346,6 @@ class Window:
 
         # ansi
         self.current_ansi = []
-
-        # Controlling key input
-        self.current_button = None
-        self.cooldown = 500
-        self.repeat_rate = 25
-        self.key_detected = False
 
         # Selecting
         self.current_select = {'coor':None, 'row_offset':self.scrollbar.offset}
@@ -485,6 +519,7 @@ class Window:
     def clear(self):
         self.cursor_pos = [0, 0]
         self.array = [[]]
+        self.ansi_codes = []
 
     def delete_text(self, amount=1):
         """Delete `amount` text from the console."""
@@ -551,99 +586,82 @@ class Window:
 
         self.cursor_pos[0], self.cursor_pos[1] = x, y
 
-    def get_pressed_key(self):
-        self.key_detected = False
-        for event in self.events:
-            if event.type == pygame.KEYDOWN and not self.key_detected:
-                self.key_detected = True
-                if (not self.current_button) or (self.current_button['key'] != event.dict['key']):
-                    dct = event.dict
-                    dct['next_press'] = pygame.time.get_ticks() + self.cooldown
-                    self.current_button = dct
-                    return True
-            if event.type == pygame.KEYUP:
-                if (self.current_button) and self.current_button['key'] == event.dict['key']:
-                    self.current_button = None
-
-        if self.current_button:
-            if pygame.time.get_ticks() >= self.current_button['next_press']:
-                self.current_button['next_press'] = pygame.time.get_ticks() + self.repeat_rate
-
-        # as of right now, without these prints. The program jitters. I cannot explain it
-        print()
-        print('\x1b[1A\x1b[1K', end='')
-
     def input(self, prompt=''):
-        """The default input function, feel free to make your own"""
         self.print(prompt)
 
-        user_text = ''
         starting_x = copy.copy(self.cursor_pos[0])
         starting_y = copy.copy(self.cursor_pos[1])
 
-        while self.running:
-            first_press = self.get_pressed_key()
+        text_input = TextInput(self.default_input, func_args={'starting_x':starting_x, 'starting_y':starting_y})
+        # self.getting_input = text_input
+        while text_input.getting_input and self.running:
+            pass
+        return text_input.user_text
 
-            if self.current_button and (first_press or pygame.time.get_ticks() >= self.current_button['next_press']):
-                x, y = self.cursor_pos
 
-                if self.current_button['key'] == 8:
-                    if user_text[:x-starting_x]:
-                        if self.current_button['mod'] == 4160:
-                            try:
-                                if user_text[(x-starting_x)-1] in self.word_delimiters:
-                                    while user_text[(x-starting_x)-1] in self.word_delimiters:
-                                        self.delete_text()
-                                        user_text = user_text[:x-starting_x-1] + user_text[x-starting_x-1+1:]
-                                        x, y = self.cursor_pos
-                                else:
-                                    while user_text[(x-starting_x)-1] not in self.word_delimiters:
-                                        self.delete_text()
-                                        user_text = user_text[:x-starting_x-1] + user_text[x-starting_x-1+1:]
-                                        x, y = self.cursor_pos
-                            except IndexError:
-                                pass
-                        else:
-                            user_text = user_text[:y] + user_text[y+1:]
-                            self.delete_text()
+    def default_input(self, key, user_text, text_input, *, starting_x, starting_y):
+        """The default input function, feel free to make your own"""
+        if key:
+            x, y = self.cursor_pos
 
-                elif self.current_button['key'] == 1073741903:
-                    self.cursor_blinker = 60
-                    if x+1 <= len(user_text)+starting_x:
-                        # self.move_cursor_to(x+1, y)
-                        self.cursor_pos = [x+1, y]
+            if key['key'] == 8:
+                if user_text[:x-starting_x]:
+                    if key['mod'] == 4160:
+                        try:
+                            if user_text[(x-starting_x)-1] in self.word_delimiters:
+                                while user_text[(x-starting_x)-1] in self.word_delimiters:
+                                    self.delete_text()
+                                    user_text = user_text[:x-starting_x-1] + user_text[x-starting_x:]
+                                    x, y = self.cursor_pos
+                            else:
+                                while user_text[(x-starting_x)-1] not in self.word_delimiters:
+                                    self.delete_text()
+                                    user_text = user_text[:x-starting_x-1] + user_text[x-starting_x:]
+                                    x, y = self.cursor_pos
+                        except IndexError:
+                            pass
+                    else:
+                        user_text = user_text[:x-starting_x-1] + user_text[x-starting_x+1:]
+                        self.delete_text()
 
-                elif self.current_button['key'] == 1073741904:
-                    self.cursor_blinker = 60
-                    if x-1 >= starting_x:
-                        # self.move_cursor_to(x-1, y)
-                        self.cursor_pos = [x-1, y]
+            elif key['key'] == 1073741903:
+                self.cursor_blinker = 60
+                if x+1 <= len(user_text)+starting_x:
+                    # self.move_cursor_to(x+1, y)
+                    self.cursor_pos = [x+1, y]
 
-                elif self.current_button['unicode'] == '\x16':
-                    for char in pyperclip.paste():
-                        if char == '\n':
-                            break
-                        self.print(char, add=True)
-                        user_text = list(user_text)
-                        user_text.insert(x, char)
-                        user_text = ''.join(user_text)
+            elif key['key'] == 1073741904:
+                self.cursor_blinker = 60
+                if x-1 >= starting_x:
+                    # self.move_cursor_to(x-1, y)
+                    self.cursor_pos = [x-1, y]
 
-                elif self.current_button['unicode'] == '\r':
-                    return user_text
-
-                elif self.current_button['unicode'] == '\t':
-                    self.print('    ', add=True)
+            elif key['unicode'] == '\x16':
+                for char in pyperclip.paste():
+                    if char == '\n':
+                        break
+                    self.print(char, add=True)
                     user_text = list(user_text)
-                    user_text.insert(x, '    ')
+                    user_text.insert(x, char)
                     user_text = ''.join(user_text)
 
-                else:
-                    if self.current_button['unicode'] not in ['\b', '\x16', '']:
-                        char = self.current_button['unicode']
-                        self.print(char, add=True)
-                        user_text = list(user_text)
-                        user_text.insert(x, char)
-                        user_text = ''.join(user_text)
+            elif key['unicode'] == '\r':
+                text_input.getting_input = False
+
+            elif key['unicode'] == '\t':
+                self.print('    ', add=True)
+                user_text = list(user_text)
+                user_text.insert(x, '    ')
+                user_text = ''.join(user_text)
+
+            else:
+                if key['unicode'] not in ['\b', '\x16', '']:
+                    char = key['unicode']
+                    self.print(char, add=True)
+                    user_text = list(user_text)
+                    user_text.insert(x, char)
+                    user_text = ''.join(user_text)
+        return user_text
 
     def wrap(self, iterable, num):
         for current_num in range(0, len(iterable), num):
@@ -782,7 +800,7 @@ class Window:
                 topleft = (x, y)
                 temp_surf = pygame.Surface(self.cell_size, pygame.SRCALPHA)
                 rect = pygame.Rect((0, 0), self.cell_size)
-                pygame.draw.rect(temp_surf, (255, 255, 255, 130), rect)
+                pygame.draw.rect(temp_surf, themes[self.theme.lower()]['selection_bg']+[128,], rect)
 
 
                 if self.smaller['coor'][0] == self.bigger['coor'][0]:
@@ -896,6 +914,8 @@ class Window:
                         slider_rect=pygame.Rect((self.screen_dimensions[0]-(self.cell_size[0]*1.8), 0), ((self.cell_size[0]*1.9), self.screen_dimensions[1]))
                     )
 
+            for text_input in text_inputs:
+                text_input.update(self.events)
             self.update_screen()
             self.clock.tick(self.FPS)
         pygame.quit()
@@ -907,6 +927,7 @@ def add_theme(theme_data):
             "foreground": rgb,
             "background": rgb,
             "cursor_col": rgb,
+            "selection_bg": rgb,
             "8bitcolors": {
                 "0": rgb,
                 "1": rgb,
