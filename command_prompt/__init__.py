@@ -1,5 +1,3 @@
-
-
 import pygame._sdl2 as sdl2
 import ctypes.util
 import threading
