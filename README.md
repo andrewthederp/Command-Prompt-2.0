@@ -37,13 +37,16 @@ We welcome contributions to this project, and we appreciate your help improving 
 # TODO
 - [ ] Make it use gpu instead of cpu
 - [x] Add support for more ansi codes
-- [ ] Add support for window re-sizing
+- [x] Add support for window re-sizing
 - [x] Allow for more customizability
 - [ ] Allow for even more customizability
 - [x] Make the scrollbar better
 - [x] Add mouse selection
 - [x] Improve mouse selection
+- [ ] Improve mouse selection to work well with emojis
 - [ ] Add hyperlinks and press-able text that execute functions
+- [ ] Add emoji support
+- [ ] Add image support
 
 # Credits
 * AndreawTheDerp - Creator, maintainer
