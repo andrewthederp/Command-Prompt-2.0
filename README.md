@@ -1,3 +1,8 @@
+# DISONTINUED DUE PERFORMANCE ISSUES AND LACK OF MAINTENANCE 
+
+
+
+
 # Command-Prompt-2.0
 This repository contains a command prompt clone that makes it easy to create CLI (Command Line Interface) applications. The clone is built using Python and provides a simple interface for developers to create and run CLI apps.
 
